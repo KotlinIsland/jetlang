@@ -5,13 +5,18 @@ sealed class AstNodeBase {
     abstract fun accept(visitor: AstVisitor)
 }
 
+data class Program(val nodes: List<AstNodeBase>) : AstNodeBase() {
+    override fun accept(visitor: AstVisitor) = visitor.visitProgram(this)
+}
+
 sealed class Statement : AstNodeBase()
 
-class Print(val value: String) : Statement() {
+
+data class Print(val value: String) : Statement() {
     override fun accept(visitor: AstVisitor) = visitor.visitPrint(this)
 }
 
-class Out(val expression: Expression) : Statement() {
+data class Out(val expression: Expression) : Statement() {
     override fun accept(visitor: AstVisitor) = visitor.visitOut(this)
 }
 

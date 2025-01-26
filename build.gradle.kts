@@ -18,6 +18,7 @@ repositories {
 
 dependencies {
     implementation(libs.annotations)
+    implementation(libs.kudzu)
     testImplementation(kotlin("test"))
 }
 
