@@ -1,29 +1,33 @@
 package jetlang.interpreter
 
-import jetlang.parser.Out
-import jetlang.parser.Print
-import jetlang.parser.AstVisitor
-import jetlang.parser.Program
+import jetlang.parser.*
+import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.flow.channelFlow
 
 // TODO: utilize `DeepRecursiveFunction`
-class Interpreter : AstVisitor() {
-    /**
-     * the output of this interpreter, not divided into lines
-     */
-    val output = ArrayDeque<String>()
+class Interpreter : AstVisitor {
+    lateinit var outputChannel: ProducerScope<String>
 
-    override fun visitProgram(program: Program) {
+    suspend fun output(message: String) = outputChannel.send(message)
+
+    fun interpret(program: AstNodeBase) = channelFlow {
+        // TODO: Refactor this (and `outputChannel`) to not have state, maybe create a visitor per call to `interpret`
+        outputChannel = this
+        visit(program)
+    }
+
+    override suspend fun visitProgram(program: Program) {
         // TODO: consider abstracting non-leaf nodes to a default implementation
         program.nodes.forEach { visit(it) }
     }
 
-    override fun visitPrint(print: Print) {
+    override suspend fun visitPrint(print: Print) {
         // TODO: should `print` put a newline?
-        output.add(print.value)
+        output(print.value)
     }
 
-    override fun visitOut(out: Out) {
+    override suspend fun visitOut(out: Out) {
         // TODO: recursively visit the expression, perhaps introduce an `ExpressionVisitor`
-        output.add(out.expression.stringContent() + "\n")
+        output(out.expression.stringContent() + "\n")
     }
 }

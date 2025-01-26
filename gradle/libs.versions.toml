@@ -1,20 +1,27 @@
 [versions]
 # plugins
 kotlin = "2.1.0"
+compose = "1.7.3"
 qodana = "2024.3.4"
 kover = "0.9.1"
 dokka = "2.0.0"
 
 # libraries
 annotations = "26.0.2"
+coroutines = "1.8.0"
 kudzu = "5.3.0"
 
 [plugins]
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+composePlugin = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "kotlin"}
+compose = { id = "org.jetbrains.compose", version.ref = "compose" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 [libraries]
 annotations = { group = "org.jetbrains", name = "annotations", version.ref = "annotations" }
+coroutines = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutinesSwing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "coroutines" }
 kudzu = { group = "io.github.copper-leaf", name = "kudzu-core", version.ref = "kudzu" }
