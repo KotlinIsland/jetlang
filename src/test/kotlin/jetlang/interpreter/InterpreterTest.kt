@@ -1,14 +1,13 @@
 package jetlang.interpreter
 
-import jetlang.parser.Expression
-import jetlang.parser.Out
-import jetlang.parser.Print
-import jetlang.parser.AstVisitor
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Test
+import jetlang.parser.*
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class StubExpression : Expression() {
-    override fun accept(visitor: AstVisitor) = TODO("Not yet implemented")
+    override suspend fun accept(visitor: AstVisitor) = TODO("Not yet implemented")
 
     override fun stringContent() = CONTENT
     companion object {
@@ -16,19 +15,19 @@ class StubExpression : Expression() {
     }
 }
 
+fun interpret(ast: AstNodeBase) = runBlocking {
+    Interpreter().interpret(Program(listOf(ast))).toList()
+}
+
 class InterpreterTest {
     @Test
-    fun visitPrint() {
-        val interpreter = Interpreter()
+    fun visitPrint() = runBlocking {
         val stringExpression = "string expression"
-        interpreter.visit(Print(stringExpression))
-        assertEquals(listOf(stringExpression), interpreter.output.toList())
+        assertEquals(listOf(stringExpression), interpret(Print(stringExpression)))
     }
 
     @Test
-    fun visitOut() {
-        val interpreter = Interpreter()
-        interpreter.visit(Out(StubExpression()))
-        assertEquals(listOf("${StubExpression.CONTENT}\n"), interpreter.output.toList())
+    fun visitOut() = runBlocking {
+        assertEquals(listOf("${StubExpression.CONTENT}\n"), interpret(Out(StubExpression())))
     }
 }
