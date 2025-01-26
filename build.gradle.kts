@@ -1,11 +1,12 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
-    id("org.jetbrains.qodana") version "2024.3.4"
-    id("org.jetbrains.dokka") version "2.0.0"
+    alias(libs.plugins.kotlin)
+    alias(libs.plugins.qodana)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.dokka)
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "com.kotlinisland"
+version = "0.1-SNAPSHOT"
 
 kotlin {
     jvmToolchain(23)
@@ -16,8 +17,20 @@ repositories {
 }
 
 dependencies {
+    implementation(libs.annotations)
     testImplementation(kotlin("test"))
 }
+
 tasks.test {
     useJUnitPlatform()
+}
+
+kover {
+    reports {
+        total {
+            xml {
+                onCheck = true
+            }
+        }
+    }
 }
