@@ -1,8 +1,16 @@
 package jetlang.parser
 
-interface AstVisitor {
-    suspend fun visit(ast: AstNodeBase) = ast.accept(this)
-    suspend fun visitProgram(program: Program)
+
+interface StatementVisitor {
     suspend fun visitPrint(print: Print)
     suspend fun visitOut(out: Out)
+    suspend fun visitExpressionStatement(expression: ExpressionStatement)
+}
+
+interface ExpressionVisitor<out T> {
+    suspend fun visitNumberLiteral(numberLiteral: NumberLiteral): T
+}
+
+interface AstVisitor : ExpressionVisitor<Any?>, StatementVisitor {
+    suspend fun visitProgram(program: Program)
 }

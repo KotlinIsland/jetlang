@@ -3,19 +3,10 @@ package jetlang.interpreter
 import jetlang.parser.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import java.math.BigDecimal
+import kotlin.test.*
 
-class StubExpression : Expression() {
-    override suspend fun accept(visitor: AstVisitor) = TODO("Not yet implemented")
-
-    override fun stringContent() = CONTENT
-    companion object {
-        const val CONTENT = "stub expression"
-    }
-}
-
-fun interpret(ast: AstNodeBase) = runBlocking {
+fun interpret(ast: Statement) = runBlocking {
     Interpreter().interpret(Program(listOf(ast))).toList()
 }
 
@@ -28,6 +19,23 @@ class InterpreterTest {
 
     @Test
     fun visitOut() = runBlocking {
-        assertEquals(listOf("${StubExpression.CONTENT}\n"), interpret(Out(StubExpression())))
+        val expressionValue = 1
+        assertEquals(
+            listOf("$expressionValue\n"), interpret(Out(NumberLiteral(BigDecimal(expressionValue))))
+        )
+    }
+
+    @Test
+    fun visitExpressionStatement() = runBlocking {
+        var success = false
+        val someExpression = object : Expression() {
+            override suspend fun <T> accept(visitor: ExpressionVisitor<T>): T {
+                success = true
+                return visitor.visitNumberLiteral(NumberLiteral(BigDecimal(1)))
+            }
+        }
+        Interpreter().visitExpressionStatement(ExpressionStatement(someExpression))
+        assertTrue(success)
     }
 }
+

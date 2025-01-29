@@ -1,24 +1,23 @@
 package jetlang.interpreter
 
 import jetlang.parser.*
+import jetlang.types.NumberJL
+import jetlang.types.Type
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.channelFlow
 
 // TODO: utilize `DeepRecursiveFunction`
-class Interpreter : AstVisitor {
+class Interpreter : StatementVisitor {
     lateinit var outputChannel: ProducerScope<String>
+
+    val expressionInterpreter = ExpressionInterpreter()
 
     suspend fun output(message: String) = outputChannel.send(message)
 
-    fun interpret(program: AstNodeBase) = channelFlow {
+    fun interpret(program: Program) = channelFlow {
         // TODO: Refactor this (and `outputChannel`) to not have state, maybe create a visitor per call to `interpret`
         outputChannel = this
-        visit(program)
-    }
-
-    override suspend fun visitProgram(program: Program) {
-        // TODO: consider abstracting non-leaf nodes to a default implementation
-        program.nodes.forEach { visit(it) }
+        program.nodes.forEach { it.accept(this@Interpreter) }
     }
 
     override suspend fun visitPrint(print: Print) {
@@ -27,7 +26,14 @@ class Interpreter : AstVisitor {
     }
 
     override suspend fun visitOut(out: Out) {
-        // TODO: recursively visit the expression, perhaps introduce an `ExpressionVisitor`
-        output(out.expression.stringContent() + "\n")
+        output(out.expression.accept(expressionInterpreter).textContent() + "\n")
     }
+
+    override suspend fun visitExpressionStatement(expression: ExpressionStatement) {
+        expression.expression.accept(expressionInterpreter)
+    }
+}
+
+class ExpressionInterpreter : ExpressionVisitor<Type> {
+    override suspend fun visitNumberLiteral(numberLiteral: NumberLiteral) = NumberJL(numberLiteral.value)
 }

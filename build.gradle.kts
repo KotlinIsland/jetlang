@@ -9,7 +9,6 @@ plugins {
     alias(libs.plugins.qodana)
     alias(libs.plugins.kover)
     alias(libs.plugins.dokka)
-    alias(libs.plugins.allopen)
 }
 
 group = "com.kotlinisland"
