@@ -1,22 +1,38 @@
 package jetlang.parser
 
-import kotlin.test.Ignore
+import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+fun parseSingle(input: String) = parseText(input).getOrThrow().nodes.single()
+infix fun String.assertParsesAs(node: AstNodeBase) = assertEquals(node, parseSingle(this))
+
 class TestParser {
     @Test
-    fun `test print`() {
+    fun `test program`() {
         assertEquals(
-            Program(listOf(Print("a"))), parseText("""print "a"""").getOrThrow()
+            Program(listOf(Out(NumberLiteral(BigDecimal(1))))), parseText("out 1").getOrThrow()
         )
     }
 
-    @Test @Ignore("`Expression` not implemented, so can't test parsing `Out`")
+    @Test
+    fun `test print`() {
+        """print "a"""" assertParsesAs Print("a")
+    }
+
+    @Test
     fun `test out`() {
-        assertEquals(
-            Program(listOf(Print("a"))), parseText("""out a""").getOrThrow()
-        )
+        "out 1" assertParsesAs Out(NumberLiteral(BigDecimal(1)))
+    }
+
+    @Test
+    fun `test integer number literal`() {
+        "1" assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal(1)))
+    }
+
+    @Test
+    fun `test real number literal`() {
+        "1.1" assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal("1.1")))
     }
 
     @Test
@@ -46,17 +62,18 @@ class TestParser {
             exception.message,
         )
     }
+
     @Test
     fun `test invalid syntax`() {
-        val exception = parseText("""a b""").exceptionOrNull()!!
+        val exception = parseText("""<>""").exceptionOrNull()!!
         assertEquals(
             """
-            Parse error at 1:2 (EndOfInputParser)
+            Parse error at 1:1 (Choice4Parser)
 
-            Expected end of input, but still had input remaining
+            No inputs matched
             
-            1|a b
-            >>>^""".trimIndent(),
+            1|<>
+            >>^""".trimIndent(),
             exception.message,
         )
     }

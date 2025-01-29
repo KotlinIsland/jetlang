@@ -21,18 +21,20 @@ import com.copperleaf.kudzu.parser.maybe.MaybeParser
 import com.copperleaf.kudzu.parser.sequence.SequenceParser
 import com.copperleaf.kudzu.parser.text.IdentifierTokenParser
 import com.copperleaf.kudzu.parser.text.LiteralTokenParser
+import com.copperleaf.kudzu.parser.text.OptionalWhitespaceParser
 import com.copperleaf.kudzu.parser.text.RequiredWhitespaceParser
-import com.copperleaf.kudzu.parser.value.CharLiteralParser
+import java.math.BigDecimal
 
 // helpers
-val comma = CharLiteralParser(',')
+val comma = CharInParser(',')
 val space = RequiredWhitespaceParser()
+val maybeSpace = OptionalWhitespaceParser()
 
 infix fun <NodeType : Node, Return> Parser<NodeType>.mappedAs(block: ParserContext.(NodeType) -> Return) =
     MappedParser<NodeType, Return>(this, mapperFunction = block)
 
 @Suppress("UNUSED") // TODO: it will be used
-infix fun <NodeType : Node, Return : Node> Parser<NodeType>.flatten(block: ParserContext.(NodeType) -> Return) =
+infix fun <NodeType : Node, Return : Node> Parser<NodeType>.toAst(block: ParserContext.(NodeType) -> Return) =
     FlatMappedParser<NodeType, Return>(this, mapperFunction = block)
 
 infix fun <NodeType : Node, NextNode : Node, NextParser : Parser<NextNode>> Parser<NodeType>.space(
@@ -42,7 +44,7 @@ infix fun <NodeType : Node, NextNode : Node, NextParser : Parser<NextNode>> Pars
 
 // using `run` here to get an inferred return type
 fun programParser() = run {
-    val expressionParser = LazyParser<Node>()
+    val expressionParser = LazyParser<ValueNode<Expression>>()
 
     fun functionParser(name: String, args: Int, lambdaArgs: Int): Parser<*> {
         return SequenceParser(
@@ -64,7 +66,7 @@ fun programParser() = run {
             LiteralTokenParser("->"),
             space,
             expressionParser,
-            CharLiteralParser(')'),
+            CharInParser(')'),
         )
     }
 
@@ -75,24 +77,25 @@ fun programParser() = run {
         expressionParser,
     )
     val sequenceParser = SequenceParser(
-        CharLiteralParser('{'),
+        CharInParser('{'),
         expressionParser,
         comma,
         expressionParser,
-        CharLiteralParser('}'),
+        CharInParser('}'),
     )
 
     val numberParser = SequenceParser(
-        ManyParser(DigitParser()), MaybeParser(
+        ManyParser(DigitParser()),
+        MaybeParser(
             SequenceParser(
-                CharLiteralParser('.'),
+                CharInParser('.'),
                 ManyParser(DigitParser()),
             )
         )
-    )
+    ) mappedAs { NumberLiteral(BigDecimal(it.text)) }
     expressionNotOperationParser uses PredictiveChoiceParser(
         SequenceParser(
-            CharLiteralParser('('), expressionParser, CharLiteralParser(')')
+            CharInParser('('), expressionParser, CharInParser(')')
         ),
         IdentifierTokenParser(),
         sequenceParser,
@@ -100,35 +103,41 @@ fun programParser() = run {
         functionParser("map", 1, 1),
         functionParser("reduce", 2, 2),
     )
-    expressionParser uses PredictiveChoiceParser(
+    expressionParser uses (PredictiveChoiceParser(
         expressionNotOperationParser,
         operationParser,
-    )
+    ) mappedAs { it.flatten() as Expression })
     val statementParser = PredictiveChoiceParser(
         SequenceParser(
             LiteralTokenParser("var"),
             space,
             IdentifierTokenParser(),
-            CharLiteralParser('='),
+            maybeSpace,
+            CharInParser('='),
+            maybeSpace,
             expressionParser,
         ),
-        LiteralTokenParser("out") space expressionParser mappedAs { @Suppress("KotlinConstantConditions") // will be resolved
-        Out(it.node3 as Expression); TODO("implement expressions in the AST") },
+        LiteralTokenParser("out") space expressionParser mappedAs {
+            Out(it.node3.flatten() as Expression)
+        },
         SequenceParser(
             LiteralTokenParser("print"),
             space,
             CharInParser('"'),
             ManyParser(CharNotInParser('"')),
             CharInParser('"'),
-        ) mappedAs { Print(it.node4.text) }
-    )
+        ) mappedAs { Print(it.node4.text) },
+        expressionParser mappedAs { ExpressionStatement(it.value) }
+    ) mappedAs { it.flatten() as Statement }
     SequenceParser(
         SeparatedByParser(
-            PredictiveChoiceParser(statementParser, expressionParser),
+            statementParser,
             CharInParser('\n')
         ),
         EndOfInputParser()
-    ) mappedAs { Program(it.node1.children.map(Node::flatten)) }
+    ) mappedAs {
+        Program(it.node1.nodeList.map { node -> node.value })
+    }
 }
 
 fun parseText(input: String): Result<Program> {

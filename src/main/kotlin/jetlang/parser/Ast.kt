@@ -1,25 +1,45 @@
 package jetlang.parser
 
+import java.math.BigDecimal
+
 sealed class AstNodeBase {
-    // TODO: could we make this a function reference instead? to cutdown on boilerplate
-    abstract suspend fun accept(visitor: AstVisitor)
+    abstract suspend fun accept(visitor: AstVisitor): Any?
 }
 
-data class Program(val nodes: List<AstNodeBase>) : AstNodeBase() {
+data class Program(val nodes: List<Statement>) : AstNodeBase() {
     override suspend fun accept(visitor: AstVisitor) = visitor.visitProgram(this)
 }
 
-sealed class Statement : AstNodeBase()
+sealed class Statement : AstNodeBase() {
+    // this is needed because an override can't widen the input types
+    final override suspend fun accept(visitor: AstVisitor) =
+        accept(visitor as StatementVisitor)
 
+    abstract suspend fun accept(visitor: StatementVisitor)
+}
 
 data class Print(val value: String) : Statement() {
-    override suspend fun accept(visitor: AstVisitor) = visitor.visitPrint(this)
+    override suspend fun accept(visitor: StatementVisitor) = visitor.visitPrint(this)
 }
 
 data class Out(val expression: Expression) : Statement() {
-    override suspend fun accept(visitor: AstVisitor) = visitor.visitOut(this)
+    override suspend fun accept(visitor: StatementVisitor) = visitor.visitOut(this)
+}
+
+data class ExpressionStatement(val expression: Expression) : Statement() {
+    override suspend fun accept(visitor: StatementVisitor) =
+        visitor.visitExpressionStatement(this)
 }
 
 abstract class Expression : AstNodeBase() {
-    abstract fun stringContent(): String
+    // this is needed because an override can't widen the input types
+    final override suspend fun accept(visitor: AstVisitor) =
+        accept(visitor as ExpressionVisitor<*>)
+
+    abstract suspend fun <T> accept(visitor: ExpressionVisitor<T>): T
+}
+
+data class NumberLiteral(val value: BigDecimal) : Expression() {
+    override suspend fun <T> accept(visitor: ExpressionVisitor<T>) =
+        visitor.visitNumberLiteral(this)
 }
