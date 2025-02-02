@@ -11,7 +11,7 @@ class TestParser {
     @Test
     fun `test program`() {
         assertEquals(
-            Program(listOf(Out(NumberLiteral(BigDecimal(1))))), parseText("out 1").getOrThrow()
+            Program(listOf(Out(NumberLiteral(BigDecimal.ONE)))), parseText("out 1").getOrThrow()
         )
     }
 
@@ -22,17 +22,28 @@ class TestParser {
 
     @Test
     fun `test out`() {
-        "out 1" assertParsesAs Out(NumberLiteral(BigDecimal(1)))
+        "out 1" assertParsesAs Out(NumberLiteral(BigDecimal.ONE))
     }
 
     @Test
     fun `test integer number literal`() {
-        "1" assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal(1)))
+        "1" assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal.ONE))
     }
 
     @Test
     fun `test real number literal`() {
-        "1.1" assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal("1.1")))
+        val value = "1.1"
+        value assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal(value)))
+    }
+
+    @Test
+    fun `test var`() {
+        "var a = 1" assertParsesAs Var("a", NumberLiteral(BigDecimal.ONE))
+    }
+
+    @Test
+    fun `test identifier`() {
+        "a" assertParsesAs ExpressionStatement(Identifier("a"))
     }
 
     @Test

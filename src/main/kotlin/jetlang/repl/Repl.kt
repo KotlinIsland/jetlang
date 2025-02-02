@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import jetlang.interpreter.Interpreter
+import jetlang.interpreter.Output
 import jetlang.parser.parseText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,7 +33,7 @@ import kotlinx.coroutines.launch
 fun Repl() {
     val interpreter = Interpreter()
     val history = remember {
-        mutableStateListOf<Pair<String, String?>>()
+        mutableStateListOf<Pair<String, MutableList<Output>>>()
     }
     var inputFieldText by remember { mutableStateOf(TextFieldValue("")) }
     var isEvaluating by remember { mutableStateOf(false) }
@@ -40,22 +41,26 @@ fun Repl() {
     val coroutineScope = rememberCoroutineScope()
     val inputFocus = remember { FocusRequester() }
 
-    fun updateLast(value: String) {
+    fun updateLast(value: Output) {
         val (input, _) = history.removeLast()
-        history.add(input to value)
+        history.add(input to mutableListOf(value))
     }
-    fun appendLast(value: String) {
-        val (input, output) = history.removeLast()
-        history.add(input to (output ?: "") + value)
+
+    fun appendLast(value: Output) {
+        history.last().second.add(value)
     }
 
     suspend fun evaluate(input: String) {
         isEvaluating = true
-        history.add(">>> $input" to null)
+        history.add(">>> $input" to mutableListOf())
 
         parseText(input)
             .getOrElse {
-                updateLast(it.message ?: "something went wrong")
+                appendLast(
+                    it.message?.let { message ->  Output.Error(message) }
+                        ?: Output.Error("something went wrong")
+                )
+                isEvaluating = false
                 return
             }
             .let {
@@ -99,8 +104,12 @@ fun Repl() {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(entry.first, fontFamily = FontFamily.Monospace)
                                 val second = entry.second
-                                if (second != null) {
-                                    Text(second, fontFamily = FontFamily.Monospace)
+                                second.forEach {
+                                    Text(
+                                        it.value,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = if (it is Output.Error) Color.Red else Color.Unspecified
+                                    )
                                 }
                             }
                         }
@@ -143,7 +152,7 @@ fun Repl() {
                         secondary = true,
                     ) {
                         // do we want to append this instead of override anything that has already been output
-                        updateLast("Canceled")
+                        updateLast(Output.Error("Canceled"))
                         job?.cancel()
                         isEvaluating = false
                         inputFocus.requestFocus()
@@ -165,8 +174,9 @@ fun ActionButon(label: String, secondary: Boolean = false, action: () -> Unit) {
         action,
         modifier = Modifier.width(110.dp),
         shape = MaterialTheme.shapes.medium,
-        colors =  ButtonDefaults.buttonColors(
-            if (secondary) MaterialTheme.colorScheme.secondary else Color.Unspecified)
+        colors = ButtonDefaults.buttonColors(
+            if (secondary) MaterialTheme.colorScheme.secondary else Color.Unspecified
+        )
     ) {
         Text(label)
     }

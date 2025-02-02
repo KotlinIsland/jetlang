@@ -97,7 +97,7 @@ fun programParser() = run {
         SequenceParser(
             CharInParser('('), expressionParser, CharInParser(')')
         ),
-        IdentifierTokenParser(),
+        IdentifierTokenParser() mappedAs { Identifier(it.text) },
         sequenceParser,
         numberParser,
         functionParser("map", 1, 1),
@@ -116,7 +116,7 @@ fun programParser() = run {
             CharInParser('='),
             maybeSpace,
             expressionParser,
-        ),
+        ) mappedAs { Var(it.node3.text, it.node7.value) },
         LiteralTokenParser("out") space expressionParser mappedAs {
             Out(it.node3.flatten() as Expression)
         },
