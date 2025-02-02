@@ -1,16 +1,18 @@
 package jetlang.parser
 
 
-interface StatementVisitor {
-    suspend fun visitPrint(print: Print)
-    suspend fun visitOut(out: Out)
-    suspend fun visitExpressionStatement(expression: ExpressionStatement)
+interface StatementVisitor<out T> {
+    fun visitPrint(print: Print): T
+    fun visitOut(out: Out): T
+    fun visitExpressionStatement(expression: ExpressionStatement): T
+    fun visitVar(`var`: Var): T
 }
 
 interface ExpressionVisitor<out T> {
-    suspend fun visitNumberLiteral(numberLiteral: NumberLiteral): T
+    fun visitNumberLiteral(numberLiteral: NumberLiteral): T
+    fun visitIdentifier(identifier: Identifier): T
 }
 
-interface AstVisitor : ExpressionVisitor<Any?>, StatementVisitor {
-    suspend fun visitProgram(program: Program)
+interface AstVisitor<out T> : ExpressionVisitor<T>, StatementVisitor<T> {
+    fun visitProgram(program: Program): T
 }
