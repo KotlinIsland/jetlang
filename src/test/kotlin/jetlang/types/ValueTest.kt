@@ -13,6 +13,6 @@ class ValueTest {
 
     @Test
     fun `test sequence text content`() {
-        assertEquals(SequenceJL(1, 2).textContent(), "{1, 2}")
+        assertEquals(SequenceJL(1..2).textContent(), "{1 2}")
     }
 }
