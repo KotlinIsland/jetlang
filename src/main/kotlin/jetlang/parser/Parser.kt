@@ -80,9 +80,10 @@ fun programParser() = run {
         CharInParser('{'),
         expressionParser,
         comma,
+        maybeSpace,
         expressionParser,
         CharInParser('}'),
-    )
+    ) mappedAs { SequenceLiteral(it.node2.value, it.node5.value) }
 
     val numberParser = SequenceParser(
         ManyParser(DigitParser()),

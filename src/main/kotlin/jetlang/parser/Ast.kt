@@ -48,6 +48,11 @@ data class NumberLiteral(val value: BigDecimal) : Expression() {
         visitor.visitNumberLiteral(this)
 }
 
+data class SequenceLiteral(val start: Expression, val end: Expression) : Expression() {
+    override fun <T> accept(visitor: ExpressionVisitor<T>) =
+        visitor.visitSequenceLiteral(this)
+}
+
 data class Identifier(val name: String) : Expression() {
     override fun <T> accept(visitor: ExpressionVisitor<T>) =
         visitor.visitIdentifier(this)
