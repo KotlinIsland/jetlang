@@ -69,3 +69,14 @@ data class Operation(val left: Expression, val operator: Operator, val right: Ex
     override fun <T> accept(visitor: ExpressionVisitor<T>) =
         visitor.visitOperation(this)
 }
+
+data class Reduce(
+    val input: Expression,
+    val initial: Expression,
+    val arg1: String,
+    val arg2: String,
+    val lambda: Expression,
+) : Expression() {
+    override fun <T> accept(visitor: ExpressionVisitor<T>) =
+        visitor.visitReduce(this)
+}

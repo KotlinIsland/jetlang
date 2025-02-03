@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 fun Repl() {
     val interpreter = Interpreter()
     val history = remember {
-        mutableStateListOf<Pair<String, MutableList<Output>>>()
+        mutableStateListOf<Pair<String, SnapshotStateList<Output>>>()
     }
     var inputFieldText by remember { mutableStateOf(TextFieldValue("")) }
     var isEvaluating by remember { mutableStateOf(false) }
@@ -50,7 +50,7 @@ fun Repl() {
 
     suspend fun evaluate(input: String) {
         isEvaluating = true
-        history.add(">>> $input" to mutableListOf())
+        history.add(input to mutableStateListOf())
 
         parseText(input)
             .getOrElse {
@@ -116,11 +116,21 @@ fun Repl() {
                     inputFieldText,
                     onValueChange = { inputFieldText = it },
                     modifier = Modifier.fillMaxWidth().weight(1f).onPreviewKeyEvent {
-                        if (it.key == Key.Enter && it.type == KeyEventType.KeyDown && (it.isCtrlPressed || it.isMetaPressed)) {
-                            submit()
-                            true
-                        } else {
-                            false
+                        when {
+                            it.key == Key.Enter && it.type == KeyEventType.KeyDown && (it.isCtrlPressed || it.isMetaPressed) -> {
+                                submit()
+                                true
+                            }
+
+                            it.key == Key.DirectionUp && it.type == KeyEventType.KeyDown && inputFieldText.text.isEmpty() -> {
+                                // TODO: keep track of the history
+                                inputFieldText = TextFieldValue(history.last().first)
+                                true
+                            }
+
+                            else -> {
+                                false
+                            }
                         }
                     }.focusRequester(inputFocus),
                     shape = RoundedCornerShape(8.dp),
@@ -161,7 +171,7 @@ private fun HistoryEntry(history: Pair<String, MutableList<Output>>) {
     ) {
         val entry = history
         Column(modifier = Modifier.padding(8.dp)) {
-            Text(entry.first, fontFamily = FontFamily.Monospace)
+            Text(">>> ${entry.first}", fontFamily = FontFamily.Monospace)
             val second = entry.second
             second.forEach {
                 Text(

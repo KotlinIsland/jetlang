@@ -9,10 +9,12 @@ sealed class Value {
 
 data class NumberJL(val value: BigDecimal) : Value() {
     constructor(value: Int) : this(value.toBigDecimal())
+
     override fun textContent() = value.toString()
 }
 
-data class SequenceJL(val start: Int, val end: Int) : Value() {
-    override fun textContent() =  "{$start, $end}"
+data class SequenceJL(val values: List<Value>) : Value() {
+    constructor(values: IntRange) : this(values.toList().map { NumberJL(it) })
+    override fun textContent() =
+        values.joinToString(" ", prefix = "{", postfix = "}") { it.textContent() }
 }
-

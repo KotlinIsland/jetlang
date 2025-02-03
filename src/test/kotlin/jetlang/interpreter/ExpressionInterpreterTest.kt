@@ -1,11 +1,17 @@
 import jetlang.interpreter.ExpressionInterpreter
 import jetlang.interpreter.InterpreterResult
 import jetlang.parser.Expression
+import jetlang.parser.Identifier
 import jetlang.parser.NumberLiteral
 import jetlang.parser.Operation
 import jetlang.parser.Operator
+import jetlang.parser.Reduce
+import jetlang.parser.SequenceLiteral
 import jetlang.types.NumberJL
 import jetlang.types.Value
+import jetlang.parser.plus
+import jetlang.parser.minus
+import jetlang.parser.times
 import kotlinx.coroutines.runBlocking
 import java.math.BigDecimal
 import kotlin.test.*
@@ -87,5 +93,35 @@ class ExpressionInterpreterTest {
             Operator.EXPONENT,
             NumberLiteral(2)
         ) assertInterpretsAs NumberJL(9)
+    }
+
+    @Test
+    fun `reduce one arg`() = runBlocking {
+        Reduce(
+            SequenceLiteral(NumberLiteral(2), NumberLiteral(2)),
+            NumberLiteral(1),
+            "a", "b",
+            Operation(Identifier("a"), Operator.MULTIPLY, Identifier("b"))
+        ) assertInterpretsAs NumberJL(2)
+    }
+
+    @Test
+    fun `reduce two args`() = runBlocking {
+        Reduce(
+            SequenceLiteral(NumberLiteral(2), NumberLiteral(3)),
+            NumberLiteral(1),
+            "a", "b",
+            Operation(Identifier("a"), Operator.MULTIPLY, Identifier("b"))
+        ) assertInterpretsAs NumberJL(6)
+    }
+
+    @Test
+    fun `reduce three args`() = runBlocking {
+        Reduce(
+            SequenceLiteral(NumberLiteral(2), NumberLiteral(4)),
+            NumberLiteral(1),
+            "a", "b",
+            Operation(Identifier("a"), Operator.MULTIPLY, Identifier("b"))
+        ) assertInterpretsAs NumberJL(24)
     }
 }

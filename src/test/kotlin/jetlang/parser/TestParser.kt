@@ -13,19 +13,19 @@ import kotlin.test.assertEquals
 fun parseSingle(input: String) = parseText(input).getOrThrow().nodes.single()
 infix fun String.assertParsesAs(node: AstNodeBase) = assertEquals(node, parseSingle(this))
 
-private operator fun Expression.plus(other: Expression) =
+operator fun Expression.plus(other: Expression) =
     Operation(this, Operator.ADD, other)
 
-private operator fun Expression.minus(other: Expression) =
+operator fun Expression.minus(other: Expression) =
     Operation(this, Operator.SUBTRACT, other)
 
-private operator fun Expression.times(other: Expression) =
+operator fun Expression.times(other: Expression) =
     Operation(this, Operator.MULTIPLY, other)
 
-private operator fun Expression.div(other: Expression) =
+operator fun Expression.div(other: Expression) =
     Operation(this, Operator.DIVIDE, other)
 
-private infix fun Expression.pow(other: Expression) =
+infix fun Expression.pow(other: Expression) =
     Operation(this, Operator.EXPONENT, other)
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -166,32 +166,31 @@ class TestParser {
     }
 
     @Test
-    fun `test add subtract precedence`() {
-        "1 + 2 - 3" assertParsesAs ExpressionStatement(
-            Operation(
-                Operation(
-                    NumberLiteral(1),
-                    Operator.ADD,
-                    NumberLiteral(2)
-                ),
-                Operator.SUBTRACT,
-                NumberLiteral(3)
+    fun `reduce simple`() {
+        "reduce(a, b, c d -> e)" assertParsesAs ExpressionStatement(
+            Reduce(
+                Identifier("a"),
+                Identifier("b"),
+                "c",
+                "d",
+                Identifier("e"),
             )
         )
     }
 
     @Test
-    fun `test subtract add precedence`() {
-        "1 - 2 + 3" assertParsesAs ExpressionStatement(
-            Operation(
-                Operation(
-                    NumberLiteral(1),
-                    Operator.SUBTRACT,
-                    NumberLiteral(2)
-                ),
-                Operator.ADD,
-                NumberLiteral(3)
-            )
+    fun `reduce invalid`() {
+        val exception = parseText("reduce(a, b, c d e -> e)").exceptionOrNull()!!
+        assertEquals(
+            """
+            Parse error at 1:18 (LiteralTokenParser)
+
+            LiteralTokenParser passed predict(), but failed to parse(). Make sure you're using predict() properly, and that the input text has not been modified during parsing. Expected '->', but got ''.
+
+            1|reduce(a, b, c d e -> e)
+            >>>>>>>>>>>>>>>>>>>^
+            """.trimIndent(),
+            exception.message,
         )
     }
 

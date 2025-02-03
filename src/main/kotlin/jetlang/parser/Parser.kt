@@ -12,7 +12,6 @@ import com.copperleaf.kudzu.parser.chars.DigitParser
 import com.copperleaf.kudzu.parser.chars.EndOfInputParser
 import com.copperleaf.kudzu.parser.choice.PredictiveChoiceParser
 import com.copperleaf.kudzu.parser.expression.ExpressionParser
-import com.copperleaf.kudzu.parser.expression.Operator as KudzuOperator
 import com.copperleaf.kudzu.parser.lazy.LazyParser
 import com.copperleaf.kudzu.parser.many.ManyParser
 import com.copperleaf.kudzu.parser.many.SeparatedByParser
@@ -25,6 +24,7 @@ import com.copperleaf.kudzu.parser.text.IdentifierTokenParser
 import com.copperleaf.kudzu.parser.text.LiteralTokenParser
 import com.copperleaf.kudzu.parser.text.OptionalWhitespaceParser
 import com.copperleaf.kudzu.parser.text.RequiredWhitespaceParser
+import com.copperleaf.kudzu.parser.expression.Operator as KudzuOperator
 
 // helpers
 val comma = CharInParser(',')
@@ -36,7 +36,7 @@ infix fun <NodeType : Node, Return> Parser<NodeType>.mappedAs(block: ParserConte
 
 
 @Suppress("UNUSED") // TODO: it will be used
-infix fun <NodeType : Node, Return : Node> Parser<NodeType>.toAst(block: ParserContext.(NodeType) -> Return) =
+infix fun <NodeType : Node, Return : Node> Parser<NodeType>.flatten(block: ParserContext.(NodeType) -> Return) =
     FlatMappedParser<NodeType, Return>(this, mapperFunction = block)
 
 infix fun <NodeType : Node, NextNode : Node, NextParser : Parser<NextNode>> Parser<NodeType>.space(
@@ -48,27 +48,48 @@ infix fun <NodeType : Node, NextNode : Node, NextParser : Parser<NextNode>> Pars
 fun programParser() = run {
     val expressionParser = LazyParser<ValueNode<Expression>>()
 
-    fun functionParser(name: String, args: Int, lambdaArgs: Int) = SequenceParser(
-        LiteralTokenParser("$name("),
-        TimesParser(
-            SequenceParser(
-                expressionParser,
-                comma,
-            ),
-            args,
-        ),
-        TimesParser(
-            SeparatedByParser(
-                IdentifierTokenParser(),
-                space,
-            ),
-            lambdaArgs,
-        ),
-        LiteralTokenParser("->"),
-        space,
-        expressionParser,
-        CharInParser(')'),
+    data class ParsedFunction(
+        val args: List<Expression>,
+        val lambdaArgs: List<String>,
+        val lambda: Expression
     )
+
+    fun functionParser(name: String, args: Int, lambdaArgs: Int) =
+        SequenceParser(
+            LiteralTokenParser("$name("),
+            TimesParser(
+                SequenceParser(
+                    expressionParser,
+                        maybeSpace,
+                    comma,
+                ),
+                args,
+            ) mappedAs { it.nodeList.map { node -> node.node1.value } },
+            maybeSpace,
+            SequenceParser(
+                IdentifierTokenParser(),
+                TimesParser(
+                    SequenceParser(
+                        space,
+                        IdentifierTokenParser(),
+                    ),
+                    lambdaArgs - 1,
+                )
+            ) mappedAs {
+                listOf(it.node1.text) + it.node2.nodeList.map { node -> node.node2.text }
+            },
+            space,
+            LiteralTokenParser("->"),
+            space,
+            expressionParser,
+            CharInParser(')'),
+        ) mappedAs {
+            ParsedFunction(
+                args = it.node2.value,
+                lambdaArgs = it.node4.value,
+                lambda = it.node8.value
+            )
+        }
 
     val expressionNotOperationParser = LazyParser<ValueNode<Expression>>()
     val operationParserImpl = ExpressionParser(
@@ -106,12 +127,21 @@ fun programParser() = run {
         SequenceParser(
             CharInParser('('), expressionParser, CharInParser(')')
         ) mappedAs { TODO() },
-        IdentifierTokenParser() mappedAs { Identifier(it.text) },
         sequenceParser,
         numberParser,
         functionParser("map", 1, 1),
-        functionParser("reduce", 2, 2),
-    ) mappedAs { (it.node as ValueNode<Expression>).value })
+        functionParser("reduce", 2, 2) mappedAs {
+            val function = it.value
+            Reduce(
+                function.args[0],
+                function.args[1],
+                function.lambdaArgs[0],
+                function.lambdaArgs[1],
+                function.lambda
+            )
+        },
+        IdentifierTokenParser() mappedAs { Identifier(it.text) },
+    ) mappedAs { (it.node as ValueNode<*>).value as Expression })
     expressionParser uses (PredictiveChoiceParser(
         operationParser,
         expressionNotOperationParser,
