@@ -2,7 +2,7 @@ package jetlang.interpreter
 
 import jetlang.parser.*
 import jetlang.types.NumberJL
-import jetlang.types.Type
+import jetlang.types.Value
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import java.math.BigDecimal
@@ -35,7 +35,7 @@ class InterpreterTest {
 
     @Test
     fun visitVar() = runBlocking {
-        assertEquals<Map<String, Type>>(
+        assertEquals<Map<String, Value>>(
             mapOf("a" to NumberJL(BigDecimal.ONE)),
             interpreter(Var("a", NumberLiteral(BigDecimal.ONE))).names
         )

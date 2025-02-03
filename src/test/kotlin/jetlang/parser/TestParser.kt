@@ -47,6 +47,11 @@ class TestParser {
     }
 
     @Test
+    fun `test sequence`() {
+        "{1, 2}" assertParsesAs ExpressionStatement(SequenceLiteral(NumberLiteral(BigDecimal.ONE), NumberLiteral(BigDecimal.TWO)))
+    }
+
+    @Test
     fun `test multiple lines`() {
         assertEquals(
             Program(listOf(Print("a"), Print("b"))),
