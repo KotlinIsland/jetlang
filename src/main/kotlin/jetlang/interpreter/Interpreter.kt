@@ -10,7 +10,7 @@ import java.math.BigDecimal
 
 sealed class InterpreterResult<out T : Value> {
     class Success<T : Value>(val value: T) : InterpreterResult<T>()
-    class Error(val value: InterpreterException) : InterpreterResult<Nothing>()
+    class Error(val value: String) : InterpreterResult<Nothing>()
 
     fun get() = when (this) {
         is Success -> value
@@ -24,7 +24,7 @@ sealed class InterpreterResult<out T : Value> {
 
     fun toOutput(): Output = when (this) {
         is Success -> Output.Standard(value.textContent())
-        is Error -> Output.Error(this.value.toString())
+        is Error -> Output.Error(this.value)
     }
 
     inline fun isError(function: (Error) -> Nothing) = when (this) {
@@ -33,6 +33,7 @@ sealed class InterpreterResult<out T : Value> {
     }
 }
 
+fun Value.toResult() = InterpreterResult.Success(this)
 
 sealed class Output {
     abstract val value: String
@@ -40,8 +41,6 @@ sealed class Output {
     class Standard(override val value: String) : Output()
     class Error(override val value: String) : Output()
 }
-
-class InterpreterException(message: String) : Exception(message)
 
 // TODO: utilize `DeepRecursiveFunction`
 class Interpreter : StatementVisitor<Output?> {
@@ -99,26 +98,28 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
     override fun visitIdentifier(identifier: Identifier): InterpreterResult<*> {
         val result = names[identifier.name]
         return if (result == null)
-            InterpreterResult.Error((InterpreterException("Variable \"${identifier.name}\" not defined")))
+            InterpreterResult.Error(("Variable \"${identifier.name}\" not defined"))
         else InterpreterResult.Success(result)
     }
 
     fun Value.checkSequenceValue(label: String): InterpreterResult<NumberJL> {
         if (this !is NumberJL) {
-            return InterpreterResult.Error(InterpreterException("Sequence $label value is not a number: ${textContent()}"))
+            return InterpreterResult.Error("Sequence $label value is not a number: ${textContent()}")
         }
         if (!value.isInt) {
-            return InterpreterResult.Error(InterpreterException("Sequence $label value is not an integer: ${textContent()}"))
+            return InterpreterResult.Error("Sequence $label value is not an integer: ${textContent()}")
         }
         return InterpreterResult.Success(this)
     }
 
     override fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral): InterpreterResult<SequenceJL> {
         val start =
-            sequenceLiteral.start.accept(this).map { it.checkSequenceValue("start") }.isError { return it }
-        val end = sequenceLiteral.end.accept(this).map { it.checkSequenceValue("end") }.isError { return it }
-        if (start.value >= end.value) {
-            return InterpreterResult.Error(InterpreterException("Sequence start value is greater than end value: {${start.textContent()}, ${end.textContent()}}"))
+            sequenceLiteral.start.accept(this).map { it.checkSequenceValue("start") }
+                .isError { return it }
+        val end = sequenceLiteral.end.accept(this).map { it.checkSequenceValue("end") }
+            .isError { return it }
+        if (start.value > end.value) {
+            return InterpreterResult.Error("Sequence start value is greater than end value: {${start.textContent()}, ${end.textContent()}}")
         }
         return InterpreterResult.Success(
             SequenceJL(
@@ -126,5 +127,26 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
                 end.value.intValueExact()
             )
         )
+    }
+
+    private inline fun <reified TValue : Value> Value.checkIs(message: String) =
+        when (this) {
+            is TValue -> InterpreterResult.Success(this)
+            else -> InterpreterResult.Error("$message expected ${TValue::class.simpleName}, got $this")
+        }
+
+    override fun visitOperation(operation: Operation): InterpreterResult<*> {
+        val left = operation.left.accept(this).map { it.checkIs<NumberJL>("for left operand") }
+            .isError { return it }
+        val right = operation.right.accept(this).map { it.checkIs<NumberJL>("for right operand") }
+            .isError { return it }
+        return when (operation.operator) {
+            Operator.ADD -> NumberJL(left.value + right.value)
+            Operator.SUBTRACT -> NumberJL(left.value - right.value)
+            Operator.MULTIPLY -> NumberJL(left.value * right.value)
+            Operator.DIVIDE -> NumberJL(left.value / right.value)
+            // TODO: handle non-int gracefully
+            Operator.EXPONENT -> NumberJL(left.value.pow(right.value.intValueExact()))
+        }.toResult()
     }
 }

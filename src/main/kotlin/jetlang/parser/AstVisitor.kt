@@ -12,6 +12,7 @@ interface ExpressionVisitor<out T> {
     fun visitNumberLiteral(numberLiteral: NumberLiteral): T
     fun visitIdentifier(identifier: Identifier): T
     fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral): T
+    fun visitOperation(operation: Operation): T
 }
 
 interface AstVisitor<out T> : ExpressionVisitor<T>, StatementVisitor<T> {

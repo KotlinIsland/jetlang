@@ -35,6 +35,7 @@ dependencies {
     testImplementation(kotlin("test"))
     @OptIn(ExperimentalComposeLibrary::class)
     testImplementation(compose.uiTest)
+    testCompileOnly(libs.junitJupiterParams)
 }
 
 compose.desktop {
