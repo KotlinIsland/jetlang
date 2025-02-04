@@ -44,6 +44,8 @@ abstract class Expression : AstNodeBase() {
 }
 
 data class NumberLiteral(val value: BigDecimal) : Expression() {
+    constructor(value: Int) : this(value.toBigDecimal())
+
     override fun <T> accept(visitor: ExpressionVisitor<T>) =
         visitor.visitNumberLiteral(this)
 }
@@ -58,3 +60,12 @@ data class Identifier(val name: String) : Expression() {
         visitor.visitIdentifier(this)
 }
 
+enum class Operator {
+    ADD, SUBTRACT, MULTIPLY, DIVIDE, EXPONENT
+}
+
+data class Operation(val left: Expression, val operator: Operator, val right: Expression) :
+    Expression() {
+    override fun <T> accept(visitor: ExpressionVisitor<T>) =
+        visitor.visitOperation(this)
+}

@@ -11,6 +11,8 @@ import com.copperleaf.kudzu.parser.chars.CharNotInParser
 import com.copperleaf.kudzu.parser.chars.DigitParser
 import com.copperleaf.kudzu.parser.chars.EndOfInputParser
 import com.copperleaf.kudzu.parser.choice.PredictiveChoiceParser
+import com.copperleaf.kudzu.parser.expression.ExpressionParser
+import com.copperleaf.kudzu.parser.expression.Operator as KudzuOperator
 import com.copperleaf.kudzu.parser.lazy.LazyParser
 import com.copperleaf.kudzu.parser.many.ManyParser
 import com.copperleaf.kudzu.parser.many.SeparatedByParser
@@ -23,7 +25,6 @@ import com.copperleaf.kudzu.parser.text.IdentifierTokenParser
 import com.copperleaf.kudzu.parser.text.LiteralTokenParser
 import com.copperleaf.kudzu.parser.text.OptionalWhitespaceParser
 import com.copperleaf.kudzu.parser.text.RequiredWhitespaceParser
-import java.math.BigDecimal
 
 // helpers
 val comma = CharInParser(',')
@@ -32,6 +33,7 @@ val maybeSpace = OptionalWhitespaceParser()
 
 infix fun <NodeType : Node, Return> Parser<NodeType>.mappedAs(block: ParserContext.(NodeType) -> Return) =
     MappedParser<NodeType, Return>(this, mapperFunction = block)
+
 
 @Suppress("UNUSED") // TODO: it will be used
 infix fun <NodeType : Node, Return : Node> Parser<NodeType>.toAst(block: ParserContext.(NodeType) -> Return) =
@@ -46,36 +48,42 @@ infix fun <NodeType : Node, NextNode : Node, NextParser : Parser<NextNode>> Pars
 fun programParser() = run {
     val expressionParser = LazyParser<ValueNode<Expression>>()
 
-    fun functionParser(name: String, args: Int, lambdaArgs: Int): Parser<*> {
-        return SequenceParser(
-            LiteralTokenParser("$name("),
-            TimesParser(
-                SequenceParser(
-                    expressionParser,
-                    comma,
-                ),
-                args,
+    fun functionParser(name: String, args: Int, lambdaArgs: Int) = SequenceParser(
+        LiteralTokenParser("$name("),
+        TimesParser(
+            SequenceParser(
+                expressionParser,
+                comma,
             ),
-            TimesParser(
-                SeparatedByParser(
-                    IdentifierTokenParser(),
-                    space,
-                ),
-                lambdaArgs,
+            args,
+        ),
+        TimesParser(
+            SeparatedByParser(
+                IdentifierTokenParser(),
+                space,
             ),
-            LiteralTokenParser("->"),
-            space,
-            expressionParser,
-            CharInParser(')'),
-        )
-    }
-
-    val expressionNotOperationParser = LazyParser<Node>()
-    val operationParser = SequenceParser(
-        expressionNotOperationParser,
-        CharInParser('+', '-', '*', '/', '^'),
+            lambdaArgs,
+        ),
+        LiteralTokenParser("->"),
+        space,
         expressionParser,
+        CharInParser(')'),
     )
+
+    val expressionNotOperationParser = LazyParser<ValueNode<Expression>>()
+    val operationParserImpl = ExpressionParser(
+        { SequenceParser(MaybeParser(maybeSpace), expressionNotOperationParser, maybeSpace) mappedAs {
+            it.node2.value
+        } },
+        KudzuOperator.Infix("+", 10) { left, right -> Operation(left, Operator.ADD, right) },
+        KudzuOperator.Infix("-", 10) { left, right -> Operation(left, Operator.SUBTRACT, right) },
+        KudzuOperator.Infix("*", 20) { left, right -> Operation(left, Operator.MULTIPLY, right) },
+        KudzuOperator.Infix("/", 20) { left, right -> Operation(left, Operator.DIVIDE, right) },
+        KudzuOperator.Infix("^", 30) { left, right -> Operation(left, Operator.EXPONENT, right) },
+    )
+    val operationParser = operationParserImpl mappedAs {
+        operationParserImpl.evaluator.evaluate(it)
+    }
     val sequenceParser = SequenceParser(
         CharInParser('{'),
         expressionParser,
@@ -93,21 +101,22 @@ fun programParser() = run {
                 ManyParser(DigitParser()),
             )
         )
-    ) mappedAs { NumberLiteral(BigDecimal(it.text)) }
-    expressionNotOperationParser uses PredictiveChoiceParser(
+    ) mappedAs { NumberLiteral(it.text.toBigDecimal()) }
+    expressionNotOperationParser uses (PredictiveChoiceParser(
         SequenceParser(
             CharInParser('('), expressionParser, CharInParser(')')
-        ),
+        ) mappedAs { TODO() },
         IdentifierTokenParser() mappedAs { Identifier(it.text) },
         sequenceParser,
         numberParser,
         functionParser("map", 1, 1),
         functionParser("reduce", 2, 2),
-    )
+    ) mappedAs { (it.node as ValueNode<Expression>).value })
     expressionParser uses (PredictiveChoiceParser(
-        expressionNotOperationParser,
         operationParser,
+        expressionNotOperationParser,
     ) mappedAs { it.flatten() as Expression })
+
     val statementParser = PredictiveChoiceParser(
         SequenceParser(
             LiteralTokenParser("var"),

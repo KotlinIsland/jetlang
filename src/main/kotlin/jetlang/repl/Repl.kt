@@ -4,10 +4,13 @@ import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -41,11 +44,6 @@ fun Repl() {
     val coroutineScope = rememberCoroutineScope()
     val inputFocus = remember { FocusRequester() }
 
-    fun updateLast(value: Output) {
-        val (input, _) = history.removeLast()
-        history.add(input to mutableListOf(value))
-    }
-
     fun appendLast(value: Output) {
         history.last().second.add(value)
     }
@@ -57,7 +55,7 @@ fun Repl() {
         parseText(input)
             .getOrElse {
                 appendLast(
-                    it.message?.let { message ->  Output.Error(message) }
+                    it.message?.let { message -> Output.Error(message) }
                         ?: Output.Error("something went wrong")
                 )
                 isEvaluating = false
@@ -89,30 +87,13 @@ fun Repl() {
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).padding(8.dp).testTag("history")) {
-                LazyColumn(state = listState) {
-                    items(history.size) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(end = 16.dp, bottom = 8.dp)
-                                .border(
-                                    BorderStroke(Dp.Hairline, Color.LightGray),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                        ) {
-                            val entry = history[it]
-                            Column(modifier = Modifier.padding(8.dp)) {
-                                Text(entry.first, fontFamily = FontFamily.Monospace)
-                                val second = entry.second
-                                second.forEach {
-                                    Text(
-                                        it.value,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = if (it is Output.Error) Color.Red else Color.Unspecified
-                                    )
-                                }
-                            }
-                        }
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(8.dp, 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(history) {
+                        HistoryEntry(it)
                     }
                     if (isEvaluating) item {
                         CircularProgressIndicator()
@@ -126,6 +107,7 @@ fun Repl() {
                     adapter = rememberScrollbarAdapter(listState)
                 )
             }
+            // TODO: what about a "scroll to bottom" button
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.background(Color.DarkGray).padding(8.dp)
@@ -151,8 +133,7 @@ fun Repl() {
                         "Cancel",
                         secondary = true,
                     ) {
-                        // do we want to append this instead of override anything that has already been output
-                        updateLast(Output.Error("Canceled"))
+                        appendLast(Output.Error("Canceled"))
                         job?.cancel()
                         isEvaluating = false
                         inputFocus.requestFocus()
@@ -163,6 +144,31 @@ fun Repl() {
                         inputFocus.requestFocus()
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryEntry(history: Pair<String, MutableList<Output>>) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .border(
+                BorderStroke(Dp.Hairline, Color.LightGray),
+                shape = RoundedCornerShape(8.dp)
+            )
+    ) {
+        val entry = history
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(entry.first, fontFamily = FontFamily.Monospace)
+            val second = entry.second
+            second.forEach {
+                Text(
+                    it.value,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (it is Output.Error) Color.Red else Color.Unspecified
+                )
             }
         }
     }

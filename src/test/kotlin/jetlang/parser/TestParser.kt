@@ -1,5 +1,11 @@
 package jetlang.parser
 
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.EnumSource
+import org.junit.jupiter.params.provider.MethodSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,6 +13,22 @@ import kotlin.test.assertEquals
 fun parseSingle(input: String) = parseText(input).getOrThrow().nodes.single()
 infix fun String.assertParsesAs(node: AstNodeBase) = assertEquals(node, parseSingle(this))
 
+private operator fun Expression.plus(other: Expression) =
+    Operation(this, Operator.ADD, other)
+
+private operator fun Expression.minus(other: Expression) =
+    Operation(this, Operator.SUBTRACT, other)
+
+private operator fun Expression.times(other: Expression) =
+    Operation(this, Operator.MULTIPLY, other)
+
+private operator fun Expression.div(other: Expression) =
+    Operation(this, Operator.DIVIDE, other)
+
+private infix fun Expression.pow(other: Expression) =
+    Operation(this, Operator.EXPONENT, other)
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestParser {
     @Test
     fun `test program`() {
@@ -33,7 +55,7 @@ class TestParser {
     @Test
     fun `test real number literal`() {
         val value = "1.1"
-        value assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal(value)))
+        value assertParsesAs ExpressionStatement(NumberLiteral(value.toBigDecimal()))
     }
 
     @Test
@@ -48,7 +70,129 @@ class TestParser {
 
     @Test
     fun `test sequence`() {
-        "{1, 2}" assertParsesAs ExpressionStatement(SequenceLiteral(NumberLiteral(BigDecimal.ONE), NumberLiteral(BigDecimal.TWO)))
+        "{1, 2}" assertParsesAs ExpressionStatement(
+            SequenceLiteral(
+                NumberLiteral(BigDecimal.ONE),
+                NumberLiteral(BigDecimal.TWO)
+            )
+        )
+    }
+
+    fun `test simple operators`() = listOf(
+        Arguments.of("+", Operator.ADD),
+        Arguments.of("-", Operator.SUBTRACT),
+        Arguments.of("*", Operator.MULTIPLY),
+        Arguments.of("/", Operator.DIVIDE),
+        Arguments.of("^", Operator.EXPONENT),
+    )
+
+    @ParameterizedTest
+    @MethodSource
+    fun `test simple operators`(intputOperator: String, outputOperator: Operator) {
+        "1 $intputOperator 2" assertParsesAs ExpressionStatement(
+            Operation(
+                NumberLiteral(1),
+                outputOperator,
+                NumberLiteral(2)
+            )
+        )
+    }
+
+    val one = NumberLiteral(BigDecimal.ONE)
+    val two = NumberLiteral(BigDecimal.TWO)
+    val three = NumberLiteral(3)
+
+    fun `test operator precedence`() = listOf(
+        // +
+        Arguments.of("1 + 2 + 3", (one + two) + three),
+
+        // -
+        Arguments.of("1 - 2 - 3", (one - two) - three),
+
+        // *
+        Arguments.of("1 * 2 * 3", (one * two) * three),
+
+        // /
+        Arguments.of("1 / 2 / 3", (one / two) / three),
+
+        // ^
+        Arguments.of("1 ^ 2 ^ 3", (one pow two) pow three),
+
+        // + and -
+        Arguments.of("1 + 2 - 3", (one + two) - three),
+        Arguments.of("1 - 2 + 3", (one - two) + three),
+
+        // + and *
+        Arguments.of("1 + 2 * 3", one + (two * three)),
+        Arguments.of("1 * 2 + 3", (one * two) + three),
+
+        // + and /
+        Arguments.of("1 + 2 / 3", one + (two / three)),
+        Arguments.of("1 / 2 + 3", (one / two) + three),
+
+        // + and ^
+        Arguments.of("1 + 2 ^ 3", one + (two pow three)),
+        Arguments.of("1 ^ 2 + 3", (one pow two) + three),
+
+        // - and *
+        Arguments.of("1 - 2 * 3", one - (two * three)),
+        Arguments.of("1 * 2 - 3", (one * two) - three),
+
+        // - and /
+        Arguments.of("1 - 2 / 3", one - (two / three)),
+        Arguments.of("1 / 2 - 3", (one / two) - three),
+
+        // - and ^
+        Arguments.of("1 - 2 ^ 3", one - (two pow three)),
+        Arguments.of("1 ^ 2 - 3", (one pow two) - three),
+
+        // * and /
+        Arguments.of("1 * 2 / 3", (one * two) / three),
+        Arguments.of("1 / 2 * 3", (one / two) * three),
+
+        // * and ^
+        Arguments.of("1 * 2 ^ 3", one * (two pow three)),
+        Arguments.of("1 ^ 2 * 3", (one pow two) * three),
+
+        // / and ^
+        Arguments.of("1 / 2 ^ 3", one / (two pow three)),
+        Arguments.of("1 ^ 2 / 3", (one pow two) / three),
+    )
+
+    @ParameterizedTest
+    @MethodSource
+    fun `test operator precedence`(input: String, expectedAst: Expression) {
+        input assertParsesAs ExpressionStatement(expectedAst)
+    }
+
+    @Test
+    fun `test add subtract precedence`() {
+        "1 + 2 - 3" assertParsesAs ExpressionStatement(
+            Operation(
+                Operation(
+                    NumberLiteral(1),
+                    Operator.ADD,
+                    NumberLiteral(2)
+                ),
+                Operator.SUBTRACT,
+                NumberLiteral(3)
+            )
+        )
+    }
+
+    @Test
+    fun `test subtract add precedence`() {
+        "1 - 2 + 3" assertParsesAs ExpressionStatement(
+            Operation(
+                Operation(
+                    NumberLiteral(1),
+                    Operator.SUBTRACT,
+                    NumberLiteral(2)
+                ),
+                Operator.ADD,
+                NumberLiteral(3)
+            )
+        )
     }
 
     @Test
@@ -84,7 +228,7 @@ class TestParser {
         val exception = parseText("""<>""").exceptionOrNull()!!
         assertEquals(
             """
-            Parse error at 1:1 (Choice4Parser)
+            Parse error at 1:1 (Choice6Parser)
 
             No inputs matched
             

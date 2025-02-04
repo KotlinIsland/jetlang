@@ -29,7 +29,7 @@ class InterpreterTest {
     fun visitOut() = runBlocking {
         val expressionValue = 1
         assertEquals(
-            listOf("$expressionValue\n"), interpret(Out(NumberLiteral(BigDecimal(expressionValue))))
+            listOf("$expressionValue\n"), interpret(Out(NumberLiteral(expressionValue.toBigDecimal())))
         )
     }
 
@@ -47,7 +47,7 @@ class InterpreterTest {
         assertEquals(
             listOf("$expressionValue\n"),
             interpret(
-                Var("a", NumberLiteral(BigDecimal(expressionValue))),
+                Var("a", NumberLiteral(expressionValue.toBigDecimal())),
                 Out(Identifier("a"))
             )
         )

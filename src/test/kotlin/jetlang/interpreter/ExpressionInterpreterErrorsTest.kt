@@ -3,81 +3,118 @@ import jetlang.interpreter.InterpreterResult
 import jetlang.parser.Expression
 import jetlang.parser.Identifier
 import jetlang.parser.NumberLiteral
+import jetlang.parser.Operation
+import jetlang.parser.Operator
 import jetlang.parser.SequenceLiteral
-import jetlang.types.Value
-import kotlinx.coroutines.runBlocking
+import jetlang.types.SequenceJL
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-fun interpretExpression(expression: Expression): InterpreterResult<Value> =
-    expression.accept(ExpressionInterpreter(emptyMap()))
+fun interpretExpressionError(expression: Expression) =
+    (expression.accept(ExpressionInterpreter(emptyMap())) as InterpreterResult.Error).value
 
 val sequenceLiteral
     get() = SequenceLiteral(NumberLiteral(BigDecimal.ONE), NumberLiteral(BigDecimal.TWO))
 
 class ExpressionInterpreterErrorsTest {
     @Test
-    fun `test undefined variable`() = runBlocking {
-        val exception = interpretExpression(Identifier("a"))
+    fun `test undefined variable`() {
         assertEquals(
             "Variable \"a\" not defined",
-            (exception as InterpreterResult.Error).value.message
+            interpretExpressionError(Identifier("a"))
         )
     }
 
     @Test
     fun `test sequence start not number`() {
-        val output = interpretExpression(
-            SequenceLiteral(sequenceLiteral, NumberLiteral(BigDecimal.TWO))
-        ) as InterpreterResult.Error
         assertEquals(
             "Sequence start value is not a number: {1, 2}",
-            output.value.message
+            interpretExpressionError(
+                SequenceLiteral(sequenceLiteral, NumberLiteral(BigDecimal.TWO))
+            )
         )
     }
 
     @Test
     fun `test sequence start not int`() {
-        val output = interpretExpression(
-            SequenceLiteral(NumberLiteral(BigDecimal("1.5")), NumberLiteral(BigDecimal.TWO))
-        ) as InterpreterResult.Error
         assertEquals(
             "Sequence start value is not an integer: 1.5",
-            output.value.message
+            interpretExpressionError(
+                SequenceLiteral(
+                    NumberLiteral(1.5.toBigDecimal()), NumberLiteral(BigDecimal.TWO)
+                )
+            )
         )
     }
 
     @Test
     fun `test sequence end not number`() {
-        val output = interpretExpression(
-            SequenceLiteral(NumberLiteral(BigDecimal("1")), sequenceLiteral)
-        ) as InterpreterResult.Error
         assertEquals(
             "Sequence end value is not a number: {1, 2}",
-            output.value.message
+            interpretExpressionError(
+                SequenceLiteral(
+                    NumberLiteral(BigDecimal.ONE), sequenceLiteral
+                )
+            )
         )
     }
 
     @Test
     fun `test sequence end not int`() {
-        val output = interpretExpression(
-            SequenceLiteral(NumberLiteral(BigDecimal.ONE), NumberLiteral(BigDecimal("1.5")))
-        ) as InterpreterResult.Error
         assertEquals(
             "Sequence end value is not an integer: 1.5",
-            output.value.message
+            interpretExpressionError(
+                SequenceLiteral(
+                    NumberLiteral(BigDecimal.ONE), NumberLiteral(1.5.toBigDecimal())
+                )
+            )
         )
     }
 
     @Test
+    fun `test sequence start equal`() {
+        SequenceLiteral(
+            NumberLiteral(BigDecimal.ONE),
+            NumberLiteral(BigDecimal.ONE)
+        ) assertInterpretsAs SequenceJL(1, 1)
+    }
+
+    @Test
     fun `test sequence start greater`() {
-        val output = interpretExpression(
-            SequenceLiteral(NumberLiteral(BigDecimal.TWO), NumberLiteral(BigDecimal.ONE))
-        ) as InterpreterResult.Error
         assertEquals(
             "Sequence start value is greater than end value: {2, 1}",
-            output.value.message
+            interpretExpressionError(
+                SequenceLiteral(NumberLiteral(BigDecimal.TWO), NumberLiteral(BigDecimal.ONE))
+            )
+        )
+    }
+
+    @Test
+    fun `test operation not number left`() {
+        assertEquals(
+            "for left operand expected NumberJL, got SequenceJL(start=1, end=1)",
+            interpretExpressionError(
+                Operation(
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
+                    Operator.ADD,
+                    NumberLiteral(1),
+                )
+            )
+        )
+    }
+
+    @Test
+    fun `test operation not number right`() {
+        assertEquals(
+            "for right operand expected NumberJL, got SequenceJL(start=1, end=1)",
+            interpretExpressionError(
+                Operation(
+                    NumberLiteral(1),
+                    Operator.ADD,
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
+                )
+            )
         )
     }
 }

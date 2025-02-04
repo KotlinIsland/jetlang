@@ -8,7 +8,7 @@ class ValueTest {
     @Test
     fun `test number text content`() {
         assertEquals(NumberJL(BigDecimal.ONE).textContent(), "1")
-        assertEquals(NumberJL(BigDecimal("1.5")).textContent(), "1.5")
+        assertEquals(NumberJL(1.5.toBigDecimal()).textContent(), "1.5")
     }
 
     @Test

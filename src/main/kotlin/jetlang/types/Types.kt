@@ -8,6 +8,7 @@ sealed class Value {
 }
 
 data class NumberJL(val value: BigDecimal) : Value() {
+    constructor(value: Int) : this(value.toBigDecimal())
     override fun textContent() = value.toString()
 }
 
