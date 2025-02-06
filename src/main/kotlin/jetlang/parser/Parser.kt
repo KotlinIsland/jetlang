@@ -1,7 +1,6 @@
 package jetlang.parser
 
 import com.copperleaf.kudzu.node.Node
-import com.copperleaf.kudzu.node.NonTerminalNode
 import com.copperleaf.kudzu.node.mapped.ValueNode
 import com.copperleaf.kudzu.parser.Parser
 import com.copperleaf.kudzu.parser.ParserContext
@@ -60,7 +59,7 @@ fun programParser() = run {
             TimesParser(
                 SequenceParser(
                     expressionParser,
-                        maybeSpace,
+                    maybeSpace,
                     comma,
                 ),
                 args,
@@ -93,9 +92,15 @@ fun programParser() = run {
 
     val expressionNotOperationParser = LazyParser<ValueNode<Expression>>()
     val operationParserImpl = ExpressionParser(
-        { SequenceParser(MaybeParser(maybeSpace), expressionNotOperationParser, maybeSpace) mappedAs {
-            it.node2.value
-        } },
+        {
+            SequenceParser(
+                MaybeParser(maybeSpace),
+                expressionNotOperationParser,
+                maybeSpace
+            ) mappedAs {
+                it.node2.value
+            }
+        },
         KudzuOperator.Infix("+", 10) { left, right -> Operation(left, Operator.ADD, right) },
         KudzuOperator.Infix("-", 10) { left, right -> Operation(left, Operator.SUBTRACT, right) },
         KudzuOperator.Infix("*", 20) { left, right -> Operation(left, Operator.MULTIPLY, right) },
@@ -105,31 +110,34 @@ fun programParser() = run {
     val operationParser = operationParserImpl mappedAs {
         operationParserImpl.evaluator.evaluate(it)
     }
-    val sequenceParser = SequenceParser(
-        CharInParser('{'),
-        expressionParser,
-        comma,
-        maybeSpace,
-        expressionParser,
-        CharInParser('}'),
-    ) mappedAs { SequenceLiteral(it.node2.value, it.node5.value) }
-
-    val numberParser = SequenceParser(
-        ManyParser(DigitParser()),
-        MaybeParser(
-            SequenceParser(
-                CharInParser('.'),
-                ManyParser(DigitParser()),
-            )
-        )
-    ) mappedAs { NumberLiteral(it.text.toBigDecimal()) }
     expressionNotOperationParser uses (PredictiveChoiceParser(
         SequenceParser(
             CharInParser('('), expressionParser, CharInParser(')')
-        ) mappedAs { TODO() },
-        sequenceParser,
-        numberParser,
-        functionParser("map", 1, 1),
+        ) mappedAs { it.node2.value },
+        SequenceParser(
+            CharInParser('{'),
+            expressionParser,
+            comma,
+            maybeSpace,
+            expressionParser,
+            CharInParser('}'),
+        ) mappedAs { SequenceLiteral(it.node2.value, it.node5.value) },
+        SequenceParser(
+            ManyParser(DigitParser()),
+            MaybeParser(
+                SequenceParser(
+                    CharInParser('.'),
+                    ManyParser(DigitParser()),
+                )
+            )
+        ) mappedAs { NumberLiteral(it.text.toBigDecimal()) },
+        functionParser("map", 1, 1) mappedAs {
+            MapJL(
+                it.value.args[0],
+                it.value.lambdaArgs[0],
+                it.value.lambda
+            )
+        },
         functionParser("reduce", 2, 2) mappedAs {
             val function = it.value
             Reduce(
@@ -145,7 +153,7 @@ fun programParser() = run {
     expressionParser uses (PredictiveChoiceParser(
         operationParser,
         expressionNotOperationParser,
-    ) mappedAs { it.flatten() as Expression })
+    ) mappedAs { (it.node as ValueNode<*>).value as Expression })
 
     val statementParser = PredictiveChoiceParser(
         SequenceParser(
@@ -158,7 +166,7 @@ fun programParser() = run {
             expressionParser,
         ) mappedAs { Var(it.node3.text, it.node7.value) },
         LiteralTokenParser("out") space expressionParser mappedAs {
-            Out(it.node3.flatten() as Expression)
+            Out(it.node3.value)
         },
         SequenceParser(
             LiteralTokenParser("print"),
@@ -168,7 +176,7 @@ fun programParser() = run {
             CharInParser('"'),
         ) mappedAs { Print(it.node4.text) },
         expressionParser mappedAs { ExpressionStatement(it.value) }
-    ) mappedAs { it.flatten() as Statement }
+    ) mappedAs { (it.node as ValueNode<*>).value as Statement }
     SequenceParser(
         SeparatedByParser(
             statementParser,
@@ -198,15 +206,3 @@ fun parseText(input: String): Result<Program> {
     }
     return Result.success(node.value)
 }
-
-// TODO: this might not be needed when the entire parser includes Ast mappings
-fun Node.flatten(): AstNodeBase =
-    when (this) {
-        is ValueNode<*> -> value as AstNodeBase
-        is NonTerminalNode -> {
-            require(children.size == 1)
-            children[0].flatten()
-        }
-
-        else -> error("what is $this?")
-    }

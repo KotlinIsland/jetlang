@@ -2,6 +2,7 @@ import jetlang.interpreter.ExpressionInterpreter
 import jetlang.interpreter.InterpreterResult
 import jetlang.parser.Expression
 import jetlang.parser.Identifier
+import jetlang.parser.MapJL
 import jetlang.parser.NumberLiteral
 import jetlang.parser.Operation
 import jetlang.parser.Operator
@@ -161,6 +162,36 @@ class ExpressionInterpreterErrorsTest {
                     a,
                 ),
                 mapOf("a" to NumberJL(1)),
+            )
+        )
+    }
+
+    @Test
+    fun `map input type`() {
+        assertEquals(
+            "Input for `map` expected SequenceJL, got 1",
+            interpretExpressionError(
+                MapJL(
+                    NumberLiteral(1), "a",
+                    NumberLiteral(1)
+                ),
+            )
+        )
+    }
+
+    @Test
+    fun `map raises error`() {
+        assertEquals(
+            "Sequence start value is greater than end value: {2, 1}",
+            interpretExpressionError(
+                MapJL(
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(2)),
+                    "a",
+                    SequenceLiteral(
+                        NumberLiteral(2),
+                        NumberLiteral(1)
+                    ),
+                )
             )
         )
     }

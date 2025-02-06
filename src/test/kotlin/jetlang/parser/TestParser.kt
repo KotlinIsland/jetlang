@@ -195,6 +195,24 @@ class TestParser {
     }
 
     @Test
+    fun map() {
+        "map(a, b -> c)" assertParsesAs ExpressionStatement(
+            MapJL(
+                Identifier("a"),
+                "b",
+                Identifier("c"),
+            )
+        )
+    }
+
+    @Test
+    fun parenthesis() {
+        "(1)" assertParsesAs ExpressionStatement(
+            NumberLiteral(1),
+        )
+    }
+
+    @Test
     fun `test multiple lines`() {
         assertEquals(
             Program(listOf(Print("a"), Print("b"))),
