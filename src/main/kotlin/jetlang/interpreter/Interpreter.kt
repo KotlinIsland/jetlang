@@ -6,10 +6,12 @@ import jetlang.types.NumberJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.runBlocking
 import java.math.BigDecimal
+import java.util.concurrent.CancellationException
 
 
 sealed class InterpreterResult<out T : Value> {
@@ -37,7 +39,7 @@ sealed class InterpreterResult<out T : Value> {
     }
 }
 
-fun Value.toResult() = InterpreterResult.Success(this)
+fun <TValue : Value> TValue.toResult() = InterpreterResult.Success(this)
 
 sealed class Output {
     abstract val value: String
@@ -101,8 +103,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
 
     override fun visitIdentifier(identifier: Identifier): InterpreterResult<*> {
         val result = names[identifier.name]
-        return if (result == null)
-            InterpreterResult.Error(("Variable \"${identifier.name}\" not defined"))
+        return if (result == null) InterpreterResult.Error(("Variable \"${identifier.name}\" not defined"))
         else InterpreterResult.Success(result)
     }
 
@@ -117,9 +118,8 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
     }
 
     override fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral): InterpreterResult<SequenceJL> {
-        val start =
-            sequenceLiteral.start.accept(this).map { it.checkSequenceValue("start") }
-                .isError { return it }
+        val start = sequenceLiteral.start.accept(this).map { it.checkSequenceValue("start") }
+            .isError { return it }
         val end = sequenceLiteral.end.accept(this).map { it.checkSequenceValue("end") }
             .isError { return it }
         if (start.value > end.value) {
@@ -130,11 +130,10 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
         )
     }
 
-    private inline fun <reified TValue : Value> Value.checkIs(message: String) =
-        when (this) {
-            is TValue -> InterpreterResult.Success(this)
-            else -> InterpreterResult.Error("$message expected ${TValue::class.simpleName}, got ${textContent()}")
-        }
+    private inline fun <reified TValue : Value> Value.checkIs(message: String) = when (this) {
+        is TValue -> InterpreterResult.Success(this)
+        else -> InterpreterResult.Error("$message expected ${TValue::class.simpleName}, got ${textContent()}")
+    }
 
     override fun visitOperation(operation: Operation): InterpreterResult<*> {
         val left = operation.left.accept(this).map { it.checkIs<NumberJL>("for left operand") }
@@ -152,11 +151,9 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
     }
 
     override fun visitReduce(reduce: Reduce): InterpreterResult<*> {
-        val input = reduce.input.accept(this)
-            .map { it.checkIs<SequenceJL>("Input value") }
+        val input = reduce.input.accept(this).map { it.checkIs<SequenceJL>("Input value") }
             .isError { return it }
-        val initial = reduce.initial.accept(this)
-            .map { it.checkIs<NumberJL>("Initial value") }
+        val initial = reduce.initial.accept(this).map { it.checkIs<NumberJL>("Initial value") }
             .isError { return it }
         if (!reduce.lambda.accept(IsAssociative)) {
             // TODO: we could have a nice error message that refers to the operation that isn't associative
@@ -194,6 +191,30 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
                 )
             }
         return runBlocking { executeReduce(listOf(initial, *input.values.toTypedArray())) }
+    }
+
+    override fun visitMap(map: MapJL): InterpreterResult<SequenceJL> {
+        val input =
+            map.input.accept(this).map { it.checkIs<SequenceJL>("Input for `map`") }
+                .isError { return it }
+        return runCatching {
+            runBlocking {
+                SequenceJL(
+                    input.values.map {
+                        async {
+                            map.lambda.accept(
+                                ExpressionInterpreter(
+                                    mapOf(map.arg to it)
+                                )
+                            ).isError { error ->
+                                // throw instead of returning to cancel the sibling coroutines
+                                throw CancellationException(error.value)
+                            }
+                        }
+                    }.awaitAll()
+                ).toResult()
+            }
+        }.getOrElse { InterpreterResult.Error(it.message ?: "Unknown error") }
     }
 }
 

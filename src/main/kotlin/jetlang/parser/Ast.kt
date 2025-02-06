@@ -80,3 +80,12 @@ data class Reduce(
     override fun <T> accept(visitor: ExpressionVisitor<T>) =
         visitor.visitReduce(this)
 }
+
+data class MapJL(
+    val input: Expression,
+    val arg: String,
+    val lambda: Expression,
+) : Expression() {
+    override fun <T> accept(visitor: ExpressionVisitor<T>) =
+        visitor.visitMap(this)
+}
