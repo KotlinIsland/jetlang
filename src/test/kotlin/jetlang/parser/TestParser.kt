@@ -213,13 +213,31 @@ class TestParser {
     }
 
     @Test
-    fun `test multiple lines`() {
+    fun `multiple lines`() {
         assertEquals(
             Program(listOf(Print("a"), Print("b"))),
             parseText(
                 """
                 print "a"
                 print "b"
+                """.trimIndent()
+            ).getOrThrow()
+        )
+    }
+
+    @Test
+    fun `multiple lines of expressions`() {
+        assertEquals(
+            Program(
+                listOf(
+                    ExpressionStatement(NumberLiteral(1)),
+                    ExpressionStatement(NumberLiteral(2)),
+                )
+            ),
+            parseText(
+                """
+                1
+                2
                 """.trimIndent()
             ).getOrThrow()
         )

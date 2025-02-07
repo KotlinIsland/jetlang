@@ -30,11 +30,11 @@ dependencies {
     implementation(compose.preview)
     implementation(compose.material3)
     implementation(libs.coroutines)
-    implementation(libs.coroutinesSwing)
     implementation(libs.kudzu)
     testImplementation(kotlin("test"))
     @OptIn(ExperimentalComposeLibrary::class)
     testImplementation(compose.uiTest)
+    testImplementation(libs.coroutinesTest)
     testCompileOnly(libs.junitJupiterParams)
 }
 

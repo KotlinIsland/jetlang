@@ -13,12 +13,16 @@ import jetlang.parser.plus
 import jetlang.types.NumberJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
+import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-fun interpretExpressionError(expression: Expression, names: Map<String, Value> = emptyMap()) =
+suspend fun interpretExpressionError(
+    expression: Expression,
+    names: Map<String, Value> = emptyMap()
+) =
     (expression.accept(ExpressionInterpreter(names)) as InterpreterResult.Error).value
 
 val sequenceLiteral
@@ -26,7 +30,7 @@ val sequenceLiteral
 
 class ExpressionInterpreterErrorsTest {
     @Test
-    fun `test undefined variable`() {
+    fun `test undefined variable`() = runTest {
         assertEquals(
             "Variable \"a\" not defined",
             interpretExpressionError(Identifier("a"))
@@ -34,7 +38,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test sequence start not number`() {
+    fun `test sequence start not number`() = runTest {
         assertEquals(
             "Sequence start value is not a number: {1 2}",
             interpretExpressionError(
@@ -44,7 +48,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test sequence start not int`() {
+    fun `test sequence start not int`() = runTest {
         assertEquals(
             "Sequence start value is not an integer: 1.5",
             interpretExpressionError(
@@ -56,7 +60,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test sequence end not number`() {
+    fun `test sequence end not number`() = runTest  {
         assertEquals(
             "Sequence end value is not a number: {1 2}",
             interpretExpressionError(
@@ -68,7 +72,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test sequence end not int`() {
+    fun `test sequence end not int`() = runTest  {
         assertEquals(
             "Sequence end value is not an integer: 1.5",
             interpretExpressionError(
@@ -80,7 +84,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test sequence start equal`() {
+    fun `test sequence start equal`() = runTest  {
         SequenceLiteral(
             NumberLiteral(BigDecimal.ONE),
             NumberLiteral(BigDecimal.ONE)
@@ -88,7 +92,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test sequence start greater`() {
+    fun `test sequence start greater`() = runTest  {
         assertEquals(
             "Sequence start value is greater than end value: {2, 1}",
             interpretExpressionError(
@@ -98,7 +102,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test operation not number left`() {
+    fun `test operation not number left`() = runTest  {
         assertEquals(
             "for left operand expected NumberJL, got {1}",
             interpretExpressionError(
@@ -112,7 +116,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `test operation not number right`() {
+    fun `test operation not number right`() = runTest  {
         assertEquals(
             "for right operand expected NumberJL, got {1}",
             interpretExpressionError(
@@ -126,7 +130,21 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `reduce takes a sequence`() {
+    fun `raising to a decimal isn't supported`() = runTest {
+        assertEquals(
+            "Raising to a decimal is not supported",
+            interpretExpressionError(
+                Operation(
+                    NumberLiteral(1),
+                    Operator.EXPONENT,
+                    NumberLiteral(BigDecimal(1.1)),
+                )
+            )
+        )
+    }
+
+    @Test
+    fun `reduce takes a sequence`() = runTest  {
         assertEquals(
             "Input value expected SequenceJL, got 1",
             interpretExpressionError(
@@ -139,7 +157,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `reduce is associative`() {
+    fun `reduce is associative`() = runTest  {
         assertEquals(
             "The lambda expression of `reduce` must be an associative operation",
             interpretExpressionError(
@@ -152,7 +170,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `reduce lambda can't see globals`() {
+    fun `reduce lambda can't see globals`() = runTest  {
         val a = Identifier("a")
         assertEquals(
             "Variable \"a\" not defined",
@@ -167,7 +185,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `map input type`() {
+    fun `map input type`() = runTest  {
         assertEquals(
             "Input for `map` expected SequenceJL, got 1",
             interpretExpressionError(
@@ -180,7 +198,7 @@ class ExpressionInterpreterErrorsTest {
     }
 
     @Test
-    fun `map raises error`() {
+    fun `map raises error`() = runTest  {
         assertEquals(
             "Sequence start value is greater than end value: {2, 1}",
             interpretExpressionError(

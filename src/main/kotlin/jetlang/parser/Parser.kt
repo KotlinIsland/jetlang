@@ -18,6 +18,7 @@ import com.copperleaf.kudzu.parser.many.TimesParser
 import com.copperleaf.kudzu.parser.mapped.FlatMappedParser
 import com.copperleaf.kudzu.parser.mapped.MappedParser
 import com.copperleaf.kudzu.parser.maybe.MaybeParser
+import com.copperleaf.kudzu.parser.noop.NoopParser
 import com.copperleaf.kudzu.parser.sequence.SequenceParser
 import com.copperleaf.kudzu.parser.text.IdentifierTokenParser
 import com.copperleaf.kudzu.parser.text.LiteralTokenParser
@@ -27,8 +28,8 @@ import com.copperleaf.kudzu.parser.expression.Operator as KudzuOperator
 
 // helpers
 val comma = CharInParser(',')
-val space = RequiredWhitespaceParser()
-val maybeSpace = OptionalWhitespaceParser()
+val space = CharInParser(' ')
+val maybeSpace = MaybeParser(space)
 
 infix fun <NodeType : Node, Return> Parser<NodeType>.mappedAs(block: ParserContext.(NodeType) -> Return) =
     MappedParser<NodeType, Return>(this, mapperFunction = block)

@@ -1,5 +1,6 @@
 import jetlang.interpreter.ExpressionInterpreter
 import jetlang.interpreter.InterpreterResult
+import jetlang.interpreter.InterpreterResult.Success
 import jetlang.parser.Expression
 import jetlang.parser.Identifier
 import jetlang.parser.MapJL
@@ -10,21 +11,23 @@ import jetlang.parser.Reduce
 import jetlang.parser.SequenceLiteral
 import jetlang.types.NumberJL
 import jetlang.types.Value
-import jetlang.parser.plus
-import jetlang.parser.minus
-import jetlang.parser.times
 import jetlang.types.SequenceJL
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
 import kotlin.test.*
 
-infix fun Expression.assertInterpretsAs(expected: Value) = assertEquals(
+fun <TValue: Value> InterpreterResult<TValue>.get() = when (this) {
+    is Success -> value
+    is InterpreterResult.Error -> throw RuntimeException("Interpreter error: $value")
+}
+
+suspend infix fun Expression.assertInterpretsAs(expected: Value) = assertEquals(
     expected, (accept(ExpressionInterpreter(emptyMap())) as InterpreterResult.Success).value
 )
 
 class ExpressionInterpreterTest {
     @Test
-    fun visitNumberLiteral() = runBlocking {
+    fun visitNumberLiteral() = runTest {
         val expressionValue = BigDecimal.ONE
         assertEquals(
             NumberJL(expressionValue),
@@ -33,7 +36,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun visitIdentifier() = runBlocking {
+    fun visitIdentifier() = runTest {
         val expressionValue = BigDecimal.ONE
         assertEquals(
             NumberJL(expressionValue),
@@ -42,7 +45,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun visitSequenceLiteralLiteral() = runBlocking {
+    fun visitSequenceLiteralLiteral() = runTest {
         val expressionValue = BigDecimal.ONE
         assertEquals(
             NumberJL(expressionValue),
@@ -51,42 +54,42 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun `test add operation`() {
+    fun `test add operation`() = runTest  {
         Operation(
             NumberLiteral(1), Operator.ADD, NumberLiteral(2)
         ) assertInterpretsAs NumberJL(3)
     }
 
     @Test
-    fun `test subtract operation`() {
+    fun `test subtract operation`() = runTest  {
         Operation(
             NumberLiteral(3), Operator.SUBTRACT, NumberLiteral(2)
         ) assertInterpretsAs NumberJL(1)
     }
 
     @Test
-    fun `test multiply operation`() {
+    fun `test multiply operation`() = runTest  {
         Operation(
             NumberLiteral(3), Operator.MULTIPLY, NumberLiteral(2)
         ) assertInterpretsAs NumberJL(6)
     }
 
     @Test
-    fun `test divide operation`() {
+    fun `test divide operation`() = runTest  {
         Operation(
             NumberLiteral(6), Operator.DIVIDE, NumberLiteral(3)
         ) assertInterpretsAs NumberJL(2)
     }
 
     @Test
-    fun `test exponent operation`() {
+    fun `test exponent operation`() = runTest  {
         Operation(
             NumberLiteral(3), Operator.EXPONENT, NumberLiteral(2)
         ) assertInterpretsAs NumberJL(9)
     }
 
     @Test
-    fun `reduce one arg`() = runBlocking {
+    fun `reduce one arg`() = runTest {
         Reduce(
             SequenceLiteral(NumberLiteral(2), NumberLiteral(2)),
             NumberLiteral(1),
@@ -97,7 +100,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun `reduce two args`() = runBlocking {
+    fun `reduce two args`() = runTest {
         Reduce(
             SequenceLiteral(NumberLiteral(2), NumberLiteral(3)),
             NumberLiteral(1),
@@ -108,7 +111,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun `reduce three args`() = runBlocking {
+    fun `reduce three args`() = runTest {
         Reduce(
             SequenceLiteral(NumberLiteral(2), NumberLiteral(4)),
             NumberLiteral(1),
@@ -119,7 +122,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun map() {
+    fun map() = runTest  {
         MapJL(
             SequenceLiteral(NumberLiteral(1), NumberLiteral(3)),
             "a",
