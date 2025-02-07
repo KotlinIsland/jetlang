@@ -122,7 +122,7 @@ fun Repl() {
                                 true
                             }
 
-                            it.key == Key.DirectionUp && it.type == KeyEventType.KeyDown && inputFieldText.text.isEmpty() -> {
+                            it.key == Key.DirectionUp && it.type == KeyEventType.KeyDown && inputFieldText.text.isEmpty() && history.isNotEmpty() -> {
                                 // TODO: keep track of the history
                                 inputFieldText = TextFieldValue(history.last().first)
                                 true
@@ -171,7 +171,10 @@ private fun HistoryEntry(history: Pair<String, MutableList<Output>>) {
     ) {
         val entry = history
         Column(modifier = Modifier.padding(8.dp)) {
-            Text(">>> ${entry.first}", fontFamily = FontFamily.Monospace)
+            Text(
+                entry.first.split('\n').joinToString("\n... ", prefix = ">>> "),
+                fontFamily = FontFamily.Monospace
+            )
             val second = entry.second
             second.forEach {
                 Text(

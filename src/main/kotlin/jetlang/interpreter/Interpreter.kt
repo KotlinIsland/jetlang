@@ -1,5 +1,6 @@
 package jetlang.interpreter
 
+import jetlang.interpreter.Output
 import jetlang.parser.*
 import jetlang.parser.BooleanExpressionQuery.Companion.Strategy
 import jetlang.types.NumberJL
@@ -9,7 +10,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.runBlocking
+import java.lang.ArithmeticException
 import java.math.BigDecimal
 import java.util.concurrent.CancellationException
 
@@ -17,11 +18,6 @@ import java.util.concurrent.CancellationException
 sealed class InterpreterResult<out T : Value> {
     data class Success<T : Value>(val value: T) : InterpreterResult<T>()
     data class Error(val value: String) : InterpreterResult<Nothing>()
-
-    fun get() = when (this) {
-        is Success -> value
-        is Error -> throw RuntimeException("Interpreter error: $value")
-    }
 
     fun <R : Value> map(block: (Value) -> InterpreterResult<R>) = when (this) {
         is Success -> block(value)
@@ -44,8 +40,13 @@ fun <TValue : Value> TValue.toResult() = InterpreterResult.Success(this)
 sealed class Output {
     abstract val value: String
 
-    data class Standard(override val value: String) : Output()
+    data class Standard(override val value: String, val isExpression: Boolean = false) : Output()
     data class Error(override val value: String) : Output()
+}
+
+fun Output?.shouldSend() = when (this) {
+    is Output.Standard -> !this.isExpression
+    else -> true
 }
 
 // TODO: utilize `DeepRecursiveFunction`
@@ -54,42 +55,45 @@ class Interpreter : StatementVisitor<Output?> {
 
     val expressionInterpreter = ExpressionInterpreter(names)
 
-    // TODO: hmmm, not sure how this is going to work
-//    suspend fun handleResult(block: suspend () -> InterpreterResult?): Output? {
-//        val result = block()
-//        return when (result) {
-//            is InterpreterResult.Success -> null
-//            is InterpreterResult.Error -> result.toOutput()
-//        }
-//    }
-
     fun interpret(program: Program) = channelFlow {
+        var last: Output? = null
         for (it in program.nodes) {
-            it.accept(this@Interpreter)?.apply {
-                send(this)
-            } is Output.Error && break
+            val result = it.accept(this@Interpreter)?.also {
+                if (it.shouldSend()) {
+                    send(it)
+                }
+            }
+            if (result is Output.Error) {
+                return@channelFlow
+            } else {
+                last = result as Output.Standard?
+            }
+        }
+        if (last is Output.Standard && last.isExpression) {
+            send(last)
         }
     }
 
-    override fun visitPrint(print: Print): Output {
+    override suspend fun visitPrint(print: Print): Output {
         // TODO: should `print` put a newline?
         return Output.Standard(print.value)
     }
 
-    override fun visitOut(out: Out): Output {
+    override suspend fun visitOut(out: Out): Output {
         val result = out.expression.accept(expressionInterpreter).isError { return it.toOutput() }
         return Output.Standard(result.textContent() + "\n")
     }
 
-    override fun visitVar(`var`: Var): Output? {
+    override suspend fun visitVar(`var`: Var): Output? {
         names[`var`.name] =
             `var`.expression.accept(expressionInterpreter).isError { return it.toOutput() }
         return null
     }
 
-    override fun visitExpressionStatement(expression: ExpressionStatement): Output? {
-        expression.expression.accept(expressionInterpreter).isError { return it.toOutput() }
-        return null
+    override suspend fun visitExpressionStatement(expression: ExpressionStatement): Output {
+        val result =
+            expression.expression.accept(expressionInterpreter).isError { return it.toOutput() }
+        return Output.Standard(result.textContent(), isExpression = true)
     }
 }
 
@@ -98,10 +102,10 @@ val BigDecimal.isInt
 
 class ExpressionInterpreter(private val names: Map<String, Value>) :
     ExpressionVisitor<InterpreterResult<*>> {
-    override fun visitNumberLiteral(numberLiteral: NumberLiteral) =
+    override suspend fun visitNumberLiteral(numberLiteral: NumberLiteral) =
         InterpreterResult.Success(NumberJL(numberLiteral.value))
 
-    override fun visitIdentifier(identifier: Identifier): InterpreterResult<*> {
+    override suspend fun visitIdentifier(identifier: Identifier): InterpreterResult<*> {
         val result = names[identifier.name]
         return if (result == null) InterpreterResult.Error(("Variable \"${identifier.name}\" not defined"))
         else InterpreterResult.Success(result)
@@ -117,7 +121,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
         return InterpreterResult.Success(this)
     }
 
-    override fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral): InterpreterResult<SequenceJL> {
+    override suspend fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral): InterpreterResult<SequenceJL> {
         val start = sequenceLiteral.start.accept(this).map { it.checkSequenceValue("start") }
             .isError { return it }
         val end = sequenceLiteral.end.accept(this).map { it.checkSequenceValue("end") }
@@ -135,7 +139,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
         else -> InterpreterResult.Error("$message expected ${TValue::class.simpleName}, got ${textContent()}")
     }
 
-    override fun visitOperation(operation: Operation): InterpreterResult<*> {
+    override suspend fun visitOperation(operation: Operation): InterpreterResult<*> {
         val left = operation.left.accept(this).map { it.checkIs<NumberJL>("for left operand") }
             .isError { return it }
         val right = operation.right.accept(this).map { it.checkIs<NumberJL>("for right operand") }
@@ -145,12 +149,19 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
             Operator.SUBTRACT -> NumberJL(left.value - right.value)
             Operator.MULTIPLY -> NumberJL(left.value * right.value)
             Operator.DIVIDE -> NumberJL(left.value / right.value)
-            // TODO: handle non-int gracefully
-            Operator.EXPONENT -> NumberJL(left.value.pow(right.value.intValueExact()))
+            Operator.EXPONENT -> NumberJL(
+                left.value.pow(
+                    try {
+                        right.value.intValueExact()
+                    } catch (_: ArithmeticException) {
+                        return InterpreterResult.Error("Raising to a decimal is not supported")
+                    }
+                )
+            )
         }.toResult()
     }
 
-    override fun visitReduce(reduce: Reduce): InterpreterResult<*> {
+    override suspend fun visitReduce(reduce: Reduce): InterpreterResult<*> {
         val input = reduce.input.accept(this).map { it.checkIs<SequenceJL>("Input value") }
             .isError { return it }
         val initial = reduce.initial.accept(this).map { it.checkIs<NumberJL>("Initial value") }
@@ -160,45 +171,47 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
             return InterpreterResult.Error("The lambda expression of `reduce` must be an associative operation")
         }
         val lambda = reduce.lambda
-        suspend fun executeReduce(input: List<Value>): InterpreterResult<Value> =
-            coroutineScope {
-                if (input.size == 1) {
-                    return@coroutineScope InterpreterResult.Success(input[0])
-                }
-                if (input.size == 2) {
-                    return@coroutineScope lambda.accept(
-                        ExpressionInterpreter(
-                            mapOf(
-                                reduce.arg1 to input[0],
-                                reduce.arg2 to input[1],
-                            )
+        suspend fun executeReduce(input: List<Value>): InterpreterResult<Value> {
+            if (input.size == 1) {
+                return InterpreterResult.Success(input[0])
+            }
+            if (input.size == 2) {
+                return lambda.accept(
+                    ExpressionInterpreter(
+                        mapOf(
+                            reduce.arg1 to input[0],
+                            reduce.arg2 to input[1],
                         )
                     )
-                }
+                )
+            }
 
-                val mid = input.size / 2
-                val leftRange = input.subList(0, mid)
-                val rightRange = input.subList(mid, input.size)
-
+            val mid = input.size / 2
+            val leftRange = input.subList(0, mid)
+            val rightRange = input.subList(mid, input.size)
+            return coroutineScope {
                 val leftDeferred = async { executeReduce(leftRange) }
                 val rightDeferred = async { executeReduce(rightRange) }
 
                 executeReduce(
                     listOf(
-                        leftDeferred.await().isError { return@coroutineScope it },
-                        rightDeferred.await().isError { return@coroutineScope it },
+                        // throw here to cancel the sibling contexts
+                        leftDeferred.await().isError { throw CancellationException(it.value) },
+                        rightDeferred.await().isError { throw CancellationException(it.value) },
                     )
                 )
             }
-        return runBlocking { executeReduce(listOf(initial, *input.values.toTypedArray())) }
+        }
+        return executeReduce(listOf(initial, *input.values.toTypedArray()))
     }
 
-    override fun visitMap(map: MapJL): InterpreterResult<SequenceJL> {
+    override suspend fun visitMap(map: MapJL): InterpreterResult<SequenceJL> {
         val input =
-            map.input.accept(this).map { it.checkIs<SequenceJL>("Input for `map`") }
+            map.input.accept(this)
+                .map { it.checkIs<SequenceJL>("Input for `map`") }
                 .isError { return it }
-        return runCatching {
-            runBlocking {
+        return coroutineScope {
+            runCatching {
                 SequenceJL(
                     input.values.map {
                         async {
@@ -213,8 +226,8 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
                         }
                     }.awaitAll()
                 ).toResult()
-            }
-        }.getOrElse { InterpreterResult.Error(it.message ?: "Unknown error") }
+            }.getOrElse { InterpreterResult.Error(it.message ?: "Unknown error") }
+        }
     }
 }
 
@@ -222,10 +235,10 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
  * will never produce a false positive, but can produce false negatives
  */
 object IsAssociative : BooleanExpressionQuery(Strategy.AND) {
-    override fun visitOperation(operation: Operation) = when (operation.operator) {
+    override suspend fun visitOperation(operation: Operation) = when (operation.operator) {
         Operator.SUBTRACT, Operator.DIVIDE, Operator.EXPONENT -> false
         else -> super.visitOperation(operation)
     }
 
-    override fun visitReduce(reduce: Reduce) = false
+    override suspend fun visitReduce(reduce: Reduce) = false
 }

@@ -4,37 +4,36 @@ import jetlang.parser.*
 import jetlang.types.NumberJL
 import jetlang.types.Value
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
 import kotlin.test.*
 
-fun interpret(vararg ast: Statement) = runBlocking {
-    Interpreter().interpret(Program(ast.toList())).toList()
-}.map { it.value }
+suspend fun interpret(vararg ast: Statement)  =
+    Interpreter().interpret(Program(ast.toList())).toList().map { it.value }
 
-fun interpreter(vararg ast: Statement) = runBlocking {
+suspend fun interpreter(vararg ast: Statement) =
     Interpreter().apply {
         interpret(Program(ast.toList())).toList()
     }
-}
 
 class InterpreterTest {
     @Test
-    fun visitPrint() = runBlocking {
+    fun visitPrint() = runTest {
         val stringExpression = "string expression"
         assertEquals(listOf(stringExpression), interpret(Print(stringExpression)))
     }
 
     @Test
-    fun visitOut() = runBlocking {
+    fun visitOut() = runTest {
         val expressionValue = 1
         assertEquals(
-            listOf("$expressionValue\n"), interpret(Out(NumberLiteral(expressionValue.toBigDecimal())))
+            listOf("$expressionValue\n"),
+            interpret(Out(NumberLiteral(expressionValue.toBigDecimal())))
         )
     }
 
     @Test
-    fun visitVar() = runBlocking {
+    fun visitVar() = runTest {
         assertEquals<Map<String, Value>>(
             mapOf("a" to NumberJL(BigDecimal.ONE)),
             interpreter(Var("a", NumberLiteral(BigDecimal.ONE))).names
@@ -42,7 +41,7 @@ class InterpreterTest {
     }
 
     @Test
-    fun visitIdentifier() = runBlocking {
+    fun visitIdentifier() = runTest {
         val expressionValue = 1
         assertEquals(
             listOf("$expressionValue\n"),
@@ -54,10 +53,10 @@ class InterpreterTest {
     }
 
     @Test
-    fun visitExpressionStatement() = runBlocking {
+    fun visitExpressionStatement() = runTest {
         var success = false
         val someExpression = object : Expression() {
-            override fun <T> accept(visitor: ExpressionVisitor<T>): T {
+            override suspend fun <T> accept(visitor: ExpressionVisitor<T>): T {
                 success = true
                 return visitor.visitNumberLiteral(NumberLiteral(BigDecimal.ONE))
             }
