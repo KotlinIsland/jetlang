@@ -245,14 +245,14 @@ class TestParser {
 
     @Test
     fun `test multiple statements on same line`() {
-        val exception = parseText("""print "a" print"b""").exceptionOrNull()!!
+        val exception = parseText("""print "a" print "b"""").exceptionOrNull()!!
         assertEquals(
             """
             Parse error at 1:10 (EndOfInputParser)
 
             Expected end of input, but still had input remaining
             
-            1|print "a" print"b
+            1|print "a" print "b"
             >>>>>>>>>>>^""".trimIndent(),
             exception.message,
         )
