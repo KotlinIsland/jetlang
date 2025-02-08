@@ -55,7 +55,7 @@ class ReplTest {
     }
 
     @Test  @Ignore("cancel button disappears before we can click it")
-    fun `test cancel button`() = runComposeUiTest {
+    fun `cancel button`() = runComposeUiTest {
         setup()
 
         mainClock.autoAdvance = false
@@ -66,6 +66,41 @@ class ReplTest {
         onNodeWithText("Evaluate").assertExists()
         onNodeWithText("Canceled").assertExists()
     }
-}
 
-// TODO: can we see some ete?
+    @Test
+    fun `implicit expression`() = runComposeUiTest {
+        setup()
+
+        onNodeWithText("Enter command").performTextInput("""
+        1
+        out 2
+        3
+        4
+        """.trimIndent())
+
+        TODO()
+    }
+
+    @Test
+    fun `error shows in red`() = runComposeUiTest {
+        setup()
+
+        TODO()
+    }
+    @Test
+    fun `scroll to bottom button`() = runComposeUiTest {
+        setup()
+
+        repeat(10) {
+            onNodeWithText("Enter command").performTextInput("1")
+
+        }
+    }
+
+    @Test
+    fun `copy button`() = runComposeUiTest {
+        setup()
+
+        TODO()
+    }
+}
