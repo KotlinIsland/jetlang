@@ -1,6 +1,6 @@
 [versions]
 # plugins
-kotlin = "2.1.0"
+kotlin = "2.1.10"
 compose = "1.7.3"
 qodana = "2024.3.4"
 kover = "0.9.1"
