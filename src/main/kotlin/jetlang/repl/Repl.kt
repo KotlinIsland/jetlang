@@ -55,37 +55,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 fun Repl() {
     val interpreter = Interpreter()
     val history = remember {
-        mutableStateListOf<Pair<String, SnapshotStateList<Output>>>(
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-            "1" to mutableStateListOf(Output.Standard("1")),
-        )
+        mutableStateListOf<Pair<String, SnapshotStateList<Output>>>()
     }
     var showScrollButton by remember { mutableStateOf(false) }
-    var temporarilyHideScrollButton  by remember { mutableStateOf(false) }
+    var temporarilyHideScrollButton by remember { mutableStateOf(false) }
     var inputFieldText by remember { mutableStateOf(TextFieldValue("")) }
 
     var isEvaluating by remember { mutableStateOf(false) }
@@ -132,14 +105,14 @@ fun Repl() {
         historyListState.firstVisibleItemScrollOffset
     ) {
         showScrollButton =
-            historyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index != historyListState.layoutInfo.totalItemsCount - 1
+            history.isNotEmpty() && historyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index != historyListState.layoutInfo.totalItemsCount - 1
     }
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f).padding(8.dp).testTag("history")) {
+            Box(Modifier.weight(1f).testTag("history")) {
                 LazyColumn(
                     state = historyListState,
-                    contentPadding = PaddingValues(8.dp, 8.dp),
+                    contentPadding = PaddingValues(8.dp, 8.dp, 24.dp, 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(history) {
@@ -172,11 +145,11 @@ fun Repl() {
                 }
                 LaunchedEffect(history.size) {
                     temporarilyHideScrollButton = true
-                    historyListState.animateScrollToItem(history.lastIndex)
+                    historyListState.animateScrollToItem(history.size)
                     temporarilyHideScrollButton = false
                 }
                 VerticalScrollbar(
-                    modifier = Modifier.align(Alignment.CenterEnd),
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp),
                     adapter = rememberScrollbarAdapter(historyListState)
                 )
             }

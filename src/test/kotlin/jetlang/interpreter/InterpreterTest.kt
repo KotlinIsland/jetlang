@@ -64,4 +64,9 @@ class InterpreterTest {
         Interpreter().visitExpressionStatement(ExpressionStatement(someExpression))
         assertTrue(success)
     }
+
+    @Test
+    fun `output last expression`() = runTest {
+        TODO()
+    }
 }
