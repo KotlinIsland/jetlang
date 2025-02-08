@@ -1,21 +1,11 @@
 import jetlang.interpreter.ExpressionInterpreter
 import jetlang.interpreter.InterpreterResult
-import jetlang.parser.Expression
-import jetlang.parser.Identifier
-import jetlang.parser.MapJL
-import jetlang.parser.NumberLiteral
-import jetlang.parser.Operation
-import jetlang.parser.Operator
-import jetlang.parser.Reduce
-import jetlang.parser.SequenceLiteral
-import jetlang.parser.minus
-import jetlang.parser.plus
+import jetlang.parser.*
 import jetlang.types.NumberJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
 import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -169,6 +159,8 @@ class ExpressionInterpreterErrorsTest {
         )
     }
 
+    // TODO: reduce raises an error
+
     @Test
     fun `reduce lambda can't see globals`() = runTest  {
         val a = Identifier("a")
@@ -213,4 +205,5 @@ class ExpressionInterpreterErrorsTest {
             )
         )
     }
+    // TODO map lambda can't see globals
 }

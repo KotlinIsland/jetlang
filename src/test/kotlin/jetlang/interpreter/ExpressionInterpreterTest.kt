@@ -28,6 +28,7 @@ suspend infix fun Expression.assertInterpretsAs(expected: Value) = assertEquals(
 class ExpressionInterpreterTest {
     @Test
     fun visitNumberLiteral() = runTest {
+        // TODO: use nice function
         val expressionValue = BigDecimal.ONE
         assertEquals(
             NumberJL(expressionValue),
@@ -45,7 +46,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun visitSequenceLiteralLiteral() = runTest {
+    fun visitSequenceLiteral() = runTest {
         val expressionValue = BigDecimal.ONE
         assertEquals(
             NumberJL(expressionValue),

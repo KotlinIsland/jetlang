@@ -34,11 +34,6 @@ val maybeSpace = MaybeParser(space)
 infix fun <NodeType : Node, Return> Parser<NodeType>.mappedAs(block: ParserContext.(NodeType) -> Return) =
     MappedParser<NodeType, Return>(this, mapperFunction = block)
 
-
-@Suppress("UNUSED") // TODO: it will be used
-infix fun <NodeType : Node, Return : Node> Parser<NodeType>.flatten(block: ParserContext.(NodeType) -> Return) =
-    FlatMappedParser<NodeType, Return>(this, mapperFunction = block)
-
 infix fun <NodeType : Node, NextNode : Node, NextParser : Parser<NextNode>> Parser<NodeType>.space(
     next: NextParser
 ) =

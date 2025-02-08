@@ -29,6 +29,7 @@ dependencies {
     implementation(compose.uiTooling)
     implementation(compose.preview)
     implementation(compose.material3)
+    implementation(compose.materialIconsExtended)
     implementation(libs.coroutines)
     implementation(libs.kudzu)
     testImplementation(kotlin("test"))

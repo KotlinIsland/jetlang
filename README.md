@@ -1,3 +1,3 @@
 # JetLang
 
-a toy language
+a toy calculator language with fully functional REPL user interface
