@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kotlinisland"
-version = "0.1-SNAPSHOT"
+version = "1.0.0"
 
 kotlin {
     jvmToolchain(23)
@@ -57,7 +57,6 @@ compose.desktop {
     }
 }
 
-// TODO: figure out how to test Compose with junit platform
 tasks.test {
     useJUnitPlatform()
 }
