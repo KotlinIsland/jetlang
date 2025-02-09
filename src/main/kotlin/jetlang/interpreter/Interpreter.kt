@@ -6,12 +6,16 @@ import jetlang.types.NumberJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.channelFlow
 import java.lang.ArithmeticException
 import java.math.BigDecimal
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 
 sealed class InterpreterResult<out T : Value> {
@@ -43,9 +47,15 @@ sealed class Output {
     data class Error(override val value: String) : Output()
 }
 
-fun Output?.shouldSend() = when (this) {
-    is Output.Standard -> !this.isExpression
-    else -> true
+@OptIn(ExperimentalContracts::class)
+fun Output?.shouldSend(): Boolean {
+    contract { returns(true) implies (this@shouldSend != null) }
+
+    return when (this) {
+        is Output.Standard -> !this.isExpression
+        null -> false
+        else -> true
+    }
 }
 
 class Interpreter : StatementVisitor<Output?> {
@@ -58,7 +68,7 @@ class Interpreter : StatementVisitor<Output?> {
         for (it in program.nodes) {
             val result = it.accept(this@Interpreter)
             if (result.shouldSend()) {
-                send(result!!) // TODO: contract on shouldSend
+                send(result)
             }
             if (result is Output.Error) {
                 return@channelFlow
@@ -178,7 +188,6 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
         }
         val lambda = reduce.lambda
 
-        //TODO: just value?
         suspend fun executeReduce(input: List<Value>): InterpreterResult<Value> {
             if (input.size == 1) {
                 return InterpreterResult.Success(input[0])
@@ -198,13 +207,13 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
             val leftRange = input.subList(0, mid)
             val rightRange = input.subList(mid, input.size)
             return coroutineScope {
-                // TODO: infinity threads????
-                val leftDeferred = async { executeReduce(leftRange) }
-                val rightDeferred = async { executeReduce(rightRange) }
+                ensureActive()
+                val leftDeferred = async(Dispatchers.Default) { executeReduce(leftRange) }
+                val rightDeferred = async(Dispatchers.Default) { executeReduce(rightRange) }
 
                 executeReduce(
                     listOf(
-                        // throw here to cancel the sibling contexts
+                        // throw here to cancel the sibling coroutines
                         leftDeferred.await().isError { throw CancellationException(it.value) },
                         rightDeferred.await().isError { throw CancellationException(it.value) },
                     )
@@ -213,9 +222,8 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
         }
         return try {
             executeReduce(listOf(initial, *input.values.toTypedArray()))
-        } catch (_: CancellationException) {
-            // TODO
-            InterpreterResult.Error("fail...")
+        } catch (failure: CancellationException) {
+            InterpreterResult.Error(failure.message ?: "Reduce raised an unknown error")
         }
     }
 
@@ -228,7 +236,8 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
             runCatching {
                 SequenceJL(
                     input.values.map {
-                        async {
+                        async(Dispatchers.Default) {
+                            ensureActive()
                             map.lambda.accept(
                                 ExpressionInterpreter(
                                     mapOf(map.arg to it)

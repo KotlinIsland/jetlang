@@ -159,8 +159,6 @@ class ExpressionInterpreterErrorsTest {
         )
     }
 
-    // TODO: reduce raises an error
-
     @Test
     fun `reduce lambda can't see globals`() = runTest  {
         val a = Identifier("a")
@@ -205,5 +203,20 @@ class ExpressionInterpreterErrorsTest {
             )
         )
     }
-    // TODO map lambda can't see globals
+
+    @Test
+    fun `map lambda can't see globals`() = runTest {
+        val a = Identifier("a")
+        assertEquals(
+            "Variable \"a\" not defined",
+            interpretExpressionError(
+                MapJL(
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
+                    "it",
+                    a,
+                ),
+                mapOf("a" to NumberJL(1)),
+            )
+        )
+    }
 }

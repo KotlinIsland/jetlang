@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -45,10 +46,8 @@ import jetlang.interpreter.Output
 import jetlang.parser.parseText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
 @Preview()
@@ -66,13 +65,17 @@ fun Repl() {
     val coroutineScope = rememberCoroutineScope()
     val inputFocus = remember { FocusRequester() }
     val historyListState = rememberLazyListState()
+    var tempHistory by remember { mutableStateOf(TextFieldValue("")) }
+
     fun appendLast(value: Output) {
         history.last().second.add(value)
     }
 
+    var historySelection by remember { mutableIntStateOf(history.size) }
     suspend fun evaluate(input: String) {
         isEvaluating = true
         history.add(input to mutableStateListOf())
+        historySelection = history.size
         parseText(input)
             .getOrElse {
                 appendLast(
@@ -111,9 +114,10 @@ fun Repl() {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).testTag("history")) {
                 LazyColumn(
+                    Modifier.testTag("history_list"),
                     state = historyListState,
                     contentPadding = PaddingValues(8.dp, 8.dp, 24.dp, 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(history) {
                         HistoryEntry(it)
@@ -130,11 +134,14 @@ fun Repl() {
                         modifier = Modifier
                             .padding(16.dp)
                     ) {
-                        Button(onClick = {
-                            coroutineScope.launch {
-                                historyListState.animateScrollToItem(history.lastIndex)
-                            }
-                        }) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    historyListState.animateScrollToItem(history.lastIndex)
+                                }
+                            },
+                            Modifier.testTag("scroll_to_bottom_button")
+                        ) {
                             Icon(
                                 Icons.Filled.ArrowDownward,
                                 contentDescription = "Scroll to Bottom"
@@ -149,7 +156,8 @@ fun Repl() {
                     temporarilyHideScrollButton = false
                 }
                 VerticalScrollbar(
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp),
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp)
+                        .testTag("scroll_bar"),
                     adapter = rememberScrollbarAdapter(historyListState)
                 )
             }
@@ -160,22 +168,54 @@ fun Repl() {
                 TextField(
                     inputFieldText,
                     onValueChange = { inputFieldText = it },
-                    modifier = Modifier.fillMaxWidth().weight(1f).onPreviewKeyEvent {
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .focusRequester(inputFocus)
+                        .testTag("input_field")
+                        .onPreviewKeyEvent { keyEvent ->
+                        fun navigateHistory(amount: Int): Boolean {
+                            if (amount == 0) {
+                                return false
+                            }
+                            val selection = inputFieldText.selection.start
+                            if ((selection != inputFieldText.selection.end)
+                                || if (amount < 0)
+                                    selection > (inputFieldText.text.indexOf("\n")
+                                        .takeUnless { it == -1 } ?: selection)
+                                else selection < inputFieldText.text.lastIndexOf("\n") + 1
+                            ) {
+                                return false
+                            }
+                            val newSelection =
+                                (history + (tempHistory.text to null)).getOrNull(historySelection + amount) ?: return false
+                            if (historySelection == history.size) {
+                                tempHistory = inputFieldText
+                            }
+                            historySelection += amount
+                            inputFieldText = TextFieldValue(newSelection.first)
+                            return true
+                        }
+                        if (keyEvent.type != KeyEventType.KeyDown) {
+                            return@onPreviewKeyEvent false
+                        }
                         when {
-                            it.key == Key.Enter && it.type == KeyEventType.KeyDown && (it.isCtrlPressed || it.isMetaPressed) -> {
+                            keyEvent.key == Key.Enter && (keyEvent.isCtrlPressed || keyEvent.isMetaPressed) -> {
                                 submit()
                                 true
                             }
 
-                            it.key == Key.DirectionUp && it.type == KeyEventType.KeyDown && inputFieldText.text.isEmpty() && history.isNotEmpty() -> {
-                                // TODO: keep track of the history
-                                inputFieldText = TextFieldValue(history.last().first)
-                                true
-                            }
+                            keyEvent.key == Key.DirectionUp -> navigateHistory(
+                                -1
+                            )
+
+                            keyEvent.key == Key.DirectionDown -> navigateHistory(
+                                +1
+                            )
 
                             else -> false
                         }
-                    }.focusRequester(inputFocus),
+                    },
                     shape = RoundedCornerShape(8.dp),
                     placeholder = { Text("Enter command") },
                     textStyle = TextStyle(fontFamily = FontFamily.Monospace),
@@ -202,7 +242,7 @@ fun Repl() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
 
@@ -290,13 +330,14 @@ private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
                         .padding(8.dp)
 
                 ) {
-                    // TODO: selectable text
-                    history.second.forEach {
-                        Text(
-                            it.value,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (it is Output.Error) Color.Red else Color.Unspecified,
-                        )
+                    SelectionContainer(Modifier.testTag("output_section")) {
+                        history.second.forEach {
+                            Text(
+                                it.value,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (it is Output.Error) Color.Red else Color.Unspecified,
+                            )
+                        }
                     }
                 }
                 AnimatedVisibility(
@@ -321,12 +362,10 @@ private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
                         IconButton(
                             onClick = {
                                 clipboardManager.setText(
-                                    AnnotatedString(
-                                        history.second.joinToString(
-                                            "\n"
-                                        ) { it.value })
+                                    AnnotatedString(history.second.joinToString("\n") { it.value })
                                 )
                             },
+                            Modifier.testTag("copy_button"),
                         ) {
                             Icon(
                                 Icons.Filled.ContentCopy,
