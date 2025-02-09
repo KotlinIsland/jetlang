@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Composable
 @Preview()
 fun Repl() {
-    val interpreter = Interpreter()
+    val interpreter = remember { Interpreter() }
     val history = remember {
         mutableStateListOf<Pair<String, SnapshotStateList<Output>>>()
     }

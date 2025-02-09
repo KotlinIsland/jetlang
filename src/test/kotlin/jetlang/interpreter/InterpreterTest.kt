@@ -67,6 +67,12 @@ class InterpreterTest {
 
     @Test
     fun `output last expression`() = runTest {
-        TODO()
+        val result = interpret(
+            ExpressionStatement(NumberLiteral(1)),
+            Out(NumberLiteral(2)),
+            ExpressionStatement(NumberLiteral(3)),
+            ExpressionStatement(NumberLiteral(4)),
+        )
+        assertEquals(listOf("2", "4"), result)
     }
 }

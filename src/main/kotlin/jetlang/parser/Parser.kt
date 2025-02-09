@@ -15,14 +15,11 @@ import com.copperleaf.kudzu.parser.lazy.LazyParser
 import com.copperleaf.kudzu.parser.many.ManyParser
 import com.copperleaf.kudzu.parser.many.SeparatedByParser
 import com.copperleaf.kudzu.parser.many.TimesParser
-import com.copperleaf.kudzu.parser.mapped.FlatMappedParser
 import com.copperleaf.kudzu.parser.mapped.MappedParser
 import com.copperleaf.kudzu.parser.maybe.MaybeParser
-import com.copperleaf.kudzu.parser.noop.NoopParser
 import com.copperleaf.kudzu.parser.sequence.SequenceParser
 import com.copperleaf.kudzu.parser.text.IdentifierTokenParser
 import com.copperleaf.kudzu.parser.text.LiteralTokenParser
-import com.copperleaf.kudzu.parser.text.OptionalWhitespaceParser
 import com.copperleaf.kudzu.parser.text.RequiredWhitespaceParser
 import com.copperleaf.kudzu.parser.expression.Operator as KudzuOperator
 
@@ -176,12 +173,10 @@ fun programParser() = run {
     SequenceParser(
         SeparatedByParser(
             statementParser,
-            CharInParser('\n')
-        ),
+            ManyParser(CharInParser('\n'))
+        ) mappedAs { it.nodeList.map { node -> node.value } },
         EndOfInputParser()
-    ) mappedAs {
-        Program(it.node1.nodeList.map { node -> node.value })
-    }
+    ) mappedAs { Program(it.node1.value) }
 }
 
 fun parseText(input: String): Result<Program> {

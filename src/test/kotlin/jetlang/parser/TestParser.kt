@@ -244,6 +244,25 @@ class TestParser {
     }
 
     @Test
+    fun `blank line`() {
+        assertEquals(
+            Program(
+                listOf(
+                    ExpressionStatement(NumberLiteral(1)),
+                    ExpressionStatement(NumberLiteral(2)),
+                )
+            ),
+            parseText(
+                """
+                1
+                
+                2
+                """.trimIndent()
+            ).getOrThrow()
+        )
+    }
+
+    @Test
     fun `test multiple statements on same line`() {
         val exception = parseText("""print "a" print "b"""").exceptionOrNull()!!
         assertEquals(
