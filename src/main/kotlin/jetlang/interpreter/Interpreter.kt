@@ -182,7 +182,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
             .accept(this)
             .map { it.checkIs<NumberJL>("Initial value") }
             .isError { return it }
-        if (!reduce.lambda.accept(IsAssociative)) {
+        if (!isAssociative(reduce.lambda, reduce.arg1, reduce.arg2)) {
             // TODO: we could have a nice error message that refers to the operation that isn't associative
             return InterpreterResult.Error("The lambda expression of `reduce` must be an associative operation")
         }
@@ -254,14 +254,139 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
     }
 }
 
+
 /**
- * should never produce a false positive, but can produce false negatives
+ * simplifies an expression to just the elements that are relevant to associativity determination
  */
-object IsAssociative : BooleanExpressionQuery(Strategy.AND) {
-    override suspend fun visitOperation(operation: Operation) = when (operation.operator) {
-        Operator.SUBTRACT, Operator.DIVIDE, Operator.EXPONENT -> false
-        else -> super.visitOperation(operation)
+class AssociativeSimplifier(a: String, b: String) : ExpressionTransformer() {
+    private val a = Identifier(a)
+    private val b = Identifier(b)
+    private val zero = NumberLiteral(0)
+    private val one = NumberLiteral(1)
+
+    override suspend fun visitOperation(operation: Operation): Expression {
+        val right = operation.right.accept(this)
+        val left = operation.left.accept(this)
+        when (operation.operator) {
+            Operator.ADD -> {}
+            Operator.SUBTRACT -> {
+                if (right == zero) return left
+                if (left == zero) return right
+                if (left == right) return zero
+            }
+
+            Operator.MULTIPLY -> {
+                for ((subject, other) in listOf(left to right, right to left)) {
+                    when (subject) {
+                        zero -> return zero
+                        one -> return other
+                        else -> {}
+                    }
+                }
+            }
+
+            Operator.DIVIDE -> operation.right == one && return left
+            Operator.EXPONENT -> when (right) {
+                zero -> return one
+                one -> return left
+                else -> {}
+            }
+        }
+
+        val default = Operation(left, operation.operator, right)
+
+        suspend fun addToCount(amount: Int): Expression? {
+            // a + c * a -> (c + 1) * a
+            for (operand in listOf(a, b)) {
+                for ((subject, other) in listOf(left to right, right to left)) {
+                    if (other !is Operation || other.operator != Operator.MULTIPLY) continue
+                    for ((otherSide1, otherSide2) in listOf(
+                        other.left to other.right,
+                        other.right to other.left
+                    )) {
+                        if (otherSide1 == operand && otherSide2 is NumberLiteral && subject == operand) {
+                            return Operation(
+                                otherSide1,
+                                Operator.MULTIPLY,
+                                NumberLiteral(otherSide2.value + amount.toBigDecimal())
+                            ).accept(this)
+                        }
+                    }
+                }
+            }
+            return null
+        }
+        return when (default.operator) {
+            Operator.DIVIDE, Operator.EXPONENT -> return default
+            Operator.SUBTRACT -> {
+                addToCount(-1) ?: default
+            }
+
+            Operator.ADD -> {
+                for (subject in listOf(a, b)) {
+                    if (left == subject && right == subject) {
+                        return Operation(subject, Operator.MULTIPLY, NumberLiteral(2))
+                    } else if (left == subject && right is NumberLiteral || left is NumberLiteral && right == subject) {
+                        return subject
+                    }
+                }
+                addToCount(1)?.let { return it }
+                if (left is NumberLiteral && right is NumberLiteral) {
+                    left
+                } else default
+            }
+
+            Operator.MULTIPLY -> if (left is NumberLiteral && right is NumberLiteral) {
+                return left
+            } else default
+        }
+    }
+}
+
+class IsAssociative(private val a: String, private val b: String) : BooleanExpressionQuery(Strategy.AND) {
+    private var foundA = false
+    private var foundB = false
+    lateinit var foundOperator: Operator
+    override suspend fun visitIdentifier(identifier: Identifier): Boolean {
+        if (identifier.name == a) {
+            if (foundA) {
+                return false
+            }
+            foundA = true
+        }
+        if (identifier.name == b) {
+            if (foundB) {
+                return false
+            }
+            foundB = true
+        }
+        return true
+    }
+
+    override suspend fun visitOperation(operation: Operation): Boolean {
+        if (!::foundOperator.isInitialized) {
+            foundOperator = operation.operator
+        } else if (operation.operator != foundOperator) {
+            return false
+        }
+        return super.visitOperation(operation)
     }
 
     override suspend fun visitReduce(reduce: Reduce) = false
+
+    fun isIt() =
+        (foundA && foundB && (foundOperator == Operator.ADD || foundOperator == Operator.MULTIPLY))
+                || !(foundA || foundB)
+}
+
+/**
+ * should never produce false positives, but can produce false negatives
+ *
+ * [expression] must be some binary operation that takes the parameters [a] and [b]
+ */
+suspend fun isAssociative(expression: Expression, a: String, b: String): Boolean {
+    val simplified = expression.accept(AssociativeSimplifier(a, b))
+    val visitor = IsAssociative(a, b)
+    val result = simplified.accept(visitor)
+    return result && visitor.isIt()
 }

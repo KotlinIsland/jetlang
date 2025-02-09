@@ -10,8 +10,9 @@ import jetlang.parser.Operator
 import jetlang.parser.Reduce
 import jetlang.parser.SequenceLiteral
 import jetlang.types.NumberJL
-import jetlang.types.Value
 import jetlang.types.SequenceJL
+import jetlang.types.Value
+import jetlang.utility.*
 import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
 import kotlin.test.*
@@ -55,37 +56,27 @@ class ExpressionInterpreterTest {
 
     @Test
     fun `test add operation`() = runTest  {
-        Operation(
-            NumberLiteral(1), Operator.ADD, NumberLiteral(2)
-        ) assertInterpretsAs NumberJL(3)
+            NumberLiteral(1) +  NumberLiteral(2) assertInterpretsAs NumberJL(3)
     }
 
     @Test
     fun `test subtract operation`() = runTest  {
-        Operation(
-            NumberLiteral(3), Operator.SUBTRACT, NumberLiteral(2)
-        ) assertInterpretsAs NumberJL(1)
+        NumberLiteral(3) - NumberLiteral(2) assertInterpretsAs NumberJL(1)
     }
 
     @Test
     fun `test multiply operation`() = runTest  {
-        Operation(
-            NumberLiteral(3), Operator.MULTIPLY, NumberLiteral(2)
-        ) assertInterpretsAs NumberJL(6)
+        NumberLiteral(3) * NumberLiteral(2) assertInterpretsAs NumberJL(6)
     }
 
     @Test
     fun `test divide operation`() = runTest  {
-        Operation(
-            NumberLiteral(6), Operator.DIVIDE, NumberLiteral(3)
-        ) assertInterpretsAs NumberJL(2)
+            NumberLiteral(6) / NumberLiteral(3) assertInterpretsAs NumberJL(2)
     }
 
     @Test
     fun `test exponent operation`() = runTest  {
-        Operation(
-            NumberLiteral(3), Operator.EXPONENT, NumberLiteral(2)
-        ) assertInterpretsAs NumberJL(9)
+            NumberLiteral(3) pow NumberLiteral(2) assertInterpretsAs NumberJL(9)
     }
 
     @Test
@@ -95,7 +86,7 @@ class ExpressionInterpreterTest {
             NumberLiteral(1),
             "a",
             "b",
-            Operation(Identifier("a"), Operator.MULTIPLY, Identifier("b"))
+            Identifier("a") * Identifier("b"),
         ) assertInterpretsAs NumberJL(2)
     }
 
@@ -106,7 +97,7 @@ class ExpressionInterpreterTest {
             NumberLiteral(1),
             "a",
             "b",
-            Operation(Identifier("a"), Operator.MULTIPLY, Identifier("b"))
+            Identifier("a") * Identifier("b"),
         ) assertInterpretsAs NumberJL(6)
     }
 
@@ -117,7 +108,7 @@ class ExpressionInterpreterTest {
             NumberLiteral(1),
             "a",
             "b",
-            Operation(Identifier("a"), Operator.MULTIPLY, Identifier("b"))
+            Identifier("a") * Identifier("b"),
         ) assertInterpretsAs NumberJL(24)
     }
 
@@ -126,7 +117,7 @@ class ExpressionInterpreterTest {
         MapJL(
             SequenceLiteral(NumberLiteral(1), NumberLiteral(3)),
             "a",
-            Operation(Identifier("a"), Operator.MULTIPLY, NumberLiteral(2))
+            Identifier("a") * NumberLiteral(2),
         ) assertInterpretsAs SequenceJL(listOf(NumberJL(2), NumberJL(4), NumberJL(6)))
     }
 }

@@ -1,14 +1,16 @@
-import jetlang.interpreter.ExpressionInterpreter
-import jetlang.interpreter.InterpreterResult
+package jetlang.interpreter
+
+import assertInterpretsAs
 import jetlang.parser.*
 import jetlang.types.NumberJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
+import jetlang.utility.minus
 import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
-
+import jetlang.utility.*
 suspend fun interpretExpressionError(
     expression: Expression,
     names: Map<String, Value> = emptyMap()
@@ -96,11 +98,8 @@ class ExpressionInterpreterErrorsTest {
         assertEquals(
             "for left operand expected NumberJL, got {1}",
             interpretExpressionError(
-                Operation(
-                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
-                    Operator.ADD,
-                    NumberLiteral(1),
-                )
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1))
++                    NumberLiteral(1),
             )
         )
     }
@@ -110,11 +109,8 @@ class ExpressionInterpreterErrorsTest {
         assertEquals(
             "for right operand expected NumberJL, got {1}",
             interpretExpressionError(
-                Operation(
-                    NumberLiteral(1),
-                    Operator.ADD,
+                    NumberLiteral(1) +
                     SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
-                )
             )
         )
     }
@@ -124,11 +120,8 @@ class ExpressionInterpreterErrorsTest {
         assertEquals(
             "Raising to a decimal is not supported",
             interpretExpressionError(
-                Operation(
-                    NumberLiteral(1),
-                    Operator.EXPONENT,
+                    NumberLiteral(1) pow
                     NumberLiteral(BigDecimal(1.1)),
-                )
             )
         )
     }
@@ -152,7 +145,7 @@ class ExpressionInterpreterErrorsTest {
             "The lambda expression of `reduce` must be an associative operation",
             interpretExpressionError(
                 Reduce(
-                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)), NumberLiteral(0), "c", "d",
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)), NumberLiteral(0), "a", "b",
                     Identifier("a") - Identifier("b")
                 )
             )
