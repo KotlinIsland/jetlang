@@ -103,4 +103,11 @@ class ReplTest {
 
         TODO()
     }
+
+    @Test
+    fun `state is preserved across evaluations`() = runReplTest {
+        evaluate("var a = 1")
+        evaluate("out a")
+        onNodeWithText("1").assertExists()
+    }
 }
