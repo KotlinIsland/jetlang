@@ -27,7 +27,7 @@ class InterpreterTest {
     fun visitOut() = runTest {
         val expressionValue = 1
         assertEquals(
-            listOf("$expressionValue\n"),
+            listOf("$expressionValue"),
             interpret(Out(NumberLiteral(expressionValue.toBigDecimal())))
         )
     }
@@ -44,7 +44,7 @@ class InterpreterTest {
     fun visitIdentifier() = runTest {
         val expressionValue = 1
         assertEquals(
-            listOf("$expressionValue\n"),
+            listOf("$expressionValue"),
             interpret(
                 Var("a", NumberLiteral(expressionValue.toBigDecimal())),
                 Out(Identifier("a"))

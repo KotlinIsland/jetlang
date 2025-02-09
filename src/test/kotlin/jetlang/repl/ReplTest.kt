@@ -2,10 +2,18 @@
 
 package jetlang.repl
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import kotlin.test.Ignore
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 fun ComposeUiTest.setup() {
     setContent {
@@ -13,12 +21,29 @@ fun ComposeUiTest.setup() {
     }
 }
 
+fun runReplTest(block: ComposeUiTest.() -> Unit) = runComposeUiTest {
+    setup()
+    block()
+}
+
+fun ComposeUiTest.evaluate(command: String) {
+    inputField.performTextInput(command)
+    onNodeWithText("Evaluate").performClick()
+}
+
+val ComposeUiTest.outputSection
+    get() = onNodeWithTag("output_section", useUnmergedTree = true)
+
+val ComposeUiTest.inputField
+    get() = onNodeWithTag("input_field")
+
+fun hasTextSelectionRange(value: TextRange) = SemanticsMatcher.expectValue(
+    SemanticsProperties.TextSelectionRange, value
+)
+
 class ReplTest {
-
     @Test
-    fun `test initial state`() = runComposeUiTest {
-        setup()
-
+    fun `test initial state`() = runReplTest {
         onNodeWithTag("history").assertExists()
         onNodeWithText("Enter command").apply {
             assertIsDisplayed()
@@ -28,21 +53,22 @@ class ReplTest {
     }
 
     @Test
-    fun `test submit button`() = runComposeUiTest {
-        setup()
-
-        val command = """print "a""""
-        onNodeWithText("Enter command").performTextInput(command)
-        onNodeWithText("Evaluate").performClick()
-        onNodeWithText(""">>> $command""").assertExists()
+    fun `evaluate button`() = runReplTest {
+        val line1 = "out 1"
+        val line2 = "out 2"
+        evaluate("$line1\n$line2")
+        onNodeWithText(
+            """
+            >>> $line1
+            ... $line2
+            """.trimIndent()
+        ).assertExists()
         onNodeWithText("Enter command").assertIsFocused()
         onNodeWithText("Evaluate").assertExists()
     }
 
     @Test
-    fun `test ctrl enter`() = runComposeUiTest {
-        setup()
-
+    fun `test ctrl enter`() = runReplTest {
         val command = "ctrl enter test"
         onNodeWithText("Enter command").performTextInput(command)
 
@@ -54,13 +80,11 @@ class ReplTest {
         onNodeWithText("Enter command").assertIsFocused()
     }
 
-    @Test  @Ignore("cancel button disappears before we can click it")
-    fun `cancel button`() = runComposeUiTest {
-        setup()
-
+    @Test
+    @Ignore("cancel button disappears before we can click it")
+    fun `cancel button`() = runReplTest {
         mainClock.autoAdvance = false
-        onNodeWithText("Enter command").performTextInput("test")
-        onNodeWithText("Evaluate").performClick()
+        evaluate("test")
         waitUntilDoesNotExist(hasText("Evaluate"))
         onNodeWithText("Cancel").performClick()
         onNodeWithText("Evaluate").assertExists()
@@ -68,40 +92,115 @@ class ReplTest {
     }
 
     @Test
-    fun `implicit expression`() = runComposeUiTest {
-        setup()
+    fun `implicit expression`() = runReplTest {
+        evaluate(
+            """
+            1
+            out 2
+            3
+            4
+            """.trimIndent()
+        )
 
-        onNodeWithText("Enter command").performTextInput("""
-        1
-        out 2
-        3
-        4
-        """.trimIndent())
-
-        TODO()
-    }
-
-    @Test
-    fun `error shows in red`() = runComposeUiTest {
-        setup()
-
-        TODO()
-    }
-    @Test
-    fun `scroll to bottom button`() = runComposeUiTest {
-        setup()
-
-        repeat(10) {
-            onNodeWithText("Enter command").performTextInput("1")
-
+        outputSection.onChildren().apply {
+            get(0).assertTextEquals("2")
+            get(1).assertTextEquals("4")
+            assertCountEquals(2)
         }
     }
 
     @Test
-    fun `copy button`() = runComposeUiTest {
-        setup()
+    fun `error shows in red`() = runReplTest {
+        evaluate("test")
+        val textLayoutResults = mutableListOf<TextLayoutResult>()
+        outputSection.onChildren().fetchSemanticsNodes()
+            .first()
+            .config.getOrNull(SemanticsActions.GetTextLayoutResult)
+            ?.action
+            ?.invoke(textLayoutResults)
+        assertEquals(Color.Red, textLayoutResults.first().layoutInput.style.color)
+    }
 
-        TODO()
+    @Test
+    fun `scroll to bottom button`() = runReplTest {
+        repeat(10) {
+            // fill the history till it is scrollable
+            evaluate("$it")
+        }
+        onNodeWithTag("history_list").performScrollToIndex(0)
+        val scrollButton = "scroll_to_bottom_button"
+        waitUntilExactlyOneExists(hasTestTag(scrollButton))
+        onNodeWithTag(scrollButton).performClick()
+        onNodeWithTag(scrollButton).assertDoesNotExist()
+        onNodeWithText("9").assertExists()
+    }
+
+    @Test
+    fun `copy button`() = runReplTest {
+        evaluate("1")
+        waitForIdle()
+        val copyButton = onNodeWithTag("copy_button")
+        copyButton.assertDoesNotExist()
+
+        outputSection.performMouseInput {
+            enter(center)
+        }
+        copyButton.assertIsDisplayed()
+
+        copyButton.performMouseInput {
+            exit()
+            enter(center)
+        }
+        onNodeWithText("Copy to Clipboard").assertExists()
+    }
+
+    @Test
+    fun `history navigation`() = runReplTest {
+        evaluate("1")
+        evaluate("2")
+        evaluate("3")
+        inputField.assertTextEquals(
+            "Enter command",
+            includeEditableText = false
+        )
+        fun up() = inputField.performKeyInput {
+            pressKey(Key.DirectionUp)
+        }
+
+        fun down() = inputField.performKeyInput {
+            pressKey(Key.DirectionDown)
+        }
+        inputField.performKeyInput {
+            pressKey(Key.DirectionUp)
+        }
+        inputField.assertTextEquals("3")
+        up()
+        inputField.assertTextEquals("2")
+        down()
+        inputField.assertTextEquals("3")
+        down()
+        inputField.assertTextEquals(
+            "Enter command",
+            includeEditableText = false
+        )
+        val multilineText = "4\n5"
+        inputField.performTextInput(multilineText)
+        up()
+        inputField.assertTextEquals(multilineText)
+
+        // Assert that the cursor is at the end of the first line
+        inputField.assert(hasTextSelectionRange(TextRange(1)))
+        up()
+        val thirdMultilineText = "3\nlast"
+        inputField.performTextClearance()
+        inputField.performTextInput(thirdMultilineText)
+        up()
+        inputField.assertTextEquals(thirdMultilineText)
+        down()
+        // ensure down from a not-last line will not navigate
+        inputField.assertTextEquals(thirdMultilineText)
+        down()
+        inputField.performTextInput(multilineText)
     }
 
     @Test
