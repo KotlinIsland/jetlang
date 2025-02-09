@@ -3,30 +3,16 @@ package jetlang.parser
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.MethodSource
-import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import jetlang.utility.*
+
 
 fun parseSingle(input: String) = parseText(input).getOrThrow().nodes.single()
 infix fun String.assertParsesAs(node: AstNodeBase) = assertEquals(node, parseSingle(this))
 
-operator fun Expression.plus(other: Expression) =
-    Operation(this, Operator.ADD, other)
-
-operator fun Expression.minus(other: Expression) =
-    Operation(this, Operator.SUBTRACT, other)
-
-operator fun Expression.times(other: Expression) =
-    Operation(this, Operator.MULTIPLY, other)
-
-operator fun Expression.div(other: Expression) =
-    Operation(this, Operator.DIVIDE, other)
-
-infix fun Expression.pow(other: Expression) =
-    Operation(this, Operator.EXPONENT, other)
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestParser {
@@ -48,13 +34,19 @@ class TestParser {
     }
 
     @Test
-    fun `test integer number literal`() {
+    fun `integer number literal`() {
         "1" assertParsesAs ExpressionStatement(NumberLiteral(BigDecimal.ONE))
     }
 
     @Test
-    fun `test real number literal`() {
+    fun `real number literal`() {
         val value = "1.1"
+        value assertParsesAs ExpressionStatement(NumberLiteral(value.toBigDecimal()))
+    }
+
+    @Test
+    fun `negative number literal`() {
+        val value = "-1.1"
         value assertParsesAs ExpressionStatement(NumberLiteral(value.toBigDecimal()))
     }
 
@@ -207,8 +199,8 @@ class TestParser {
 
     @Test
     fun parenthesis() {
-        "(1)" assertParsesAs ExpressionStatement(
-            NumberLiteral(1),
+        "(1 + 1)+(2)" assertParsesAs ExpressionStatement(
+            (NumberLiteral(1) + NumberLiteral(1)) + NumberLiteral(2),
         )
     }
 
@@ -282,9 +274,9 @@ class TestParser {
         val exception = parseText("""<>""").exceptionOrNull()!!
         assertEquals(
             """
-            Parse error at 1:1 (Choice6Parser)
+            Parse error at 1:1 (LazyParser)
 
-            No inputs matched
+            syntax error
             
             1|<>
             >>^""".trimIndent(),

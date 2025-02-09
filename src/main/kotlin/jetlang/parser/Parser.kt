@@ -12,6 +12,7 @@ import com.copperleaf.kudzu.parser.chars.EndOfInputParser
 import com.copperleaf.kudzu.parser.choice.PredictiveChoiceParser
 import com.copperleaf.kudzu.parser.expression.ExpressionParser
 import com.copperleaf.kudzu.parser.lazy.LazyParser
+import com.copperleaf.kudzu.parser.many.AtLeastParser
 import com.copperleaf.kudzu.parser.many.ManyParser
 import com.copperleaf.kudzu.parser.many.SeparatedByParser
 import com.copperleaf.kudzu.parser.many.TimesParser
@@ -86,8 +87,9 @@ fun programParser() = run {
     val expressionNotOperationParser = LazyParser<ValueNode<Expression>>()
     val operationParserImpl = ExpressionParser(
         {
+            // kudzu doesn't put optional whitespace around the parens, unfortunately
             SequenceParser(
-                MaybeParser(maybeSpace),
+                maybeSpace,
                 expressionNotOperationParser,
                 maybeSpace
             ) mappedAs {
@@ -115,15 +117,6 @@ fun programParser() = run {
             expressionParser,
             CharInParser('}'),
         ) mappedAs { SequenceLiteral(it.node2.value, it.node5.value) },
-        SequenceParser(
-            ManyParser(DigitParser()),
-            MaybeParser(
-                SequenceParser(
-                    CharInParser('.'),
-                    ManyParser(DigitParser()),
-                )
-            )
-        ) mappedAs { NumberLiteral(it.text.toBigDecimal()) },
         functionParser("map", 1, 1) mappedAs {
             MapJL(
                 it.value.args[0],
@@ -142,6 +135,16 @@ fun programParser() = run {
             )
         },
         IdentifierTokenParser() mappedAs { Identifier(it.text) },
+        SequenceParser(
+            MaybeParser(CharInParser('-')),
+            MappedParser(AtLeastParser(DigitParser(), minSize = 1), {_, _ -> ParserException("syntax error", expressionParser, this) }) { it.text },
+            MaybeParser(
+                SequenceParser(
+                    CharInParser('.'),
+                    AtLeastParser(DigitParser(), minSize = 1),
+                )
+            )
+        ) mappedAs { NumberLiteral(it.text.toBigDecimal()) },
     ) mappedAs { (it.node as ValueNode<*>).value as Expression })
     expressionParser uses (PredictiveChoiceParser(
         operationParser,

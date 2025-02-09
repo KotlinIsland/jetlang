@@ -21,6 +21,37 @@ interface AstVisitor<out T> : ExpressionVisitor<T>, StatementVisitor<T> {
     fun visitProgram(program: Program): T
 }
 
+open class ExpressionTransformer : ExpressionVisitor<Expression> {
+    override suspend fun visitIdentifier(identifier: Identifier) = identifier
+    override suspend fun visitMap(map: MapJL) = MapJL(
+        input = map.input.accept(this),
+        arg = map.arg,
+        lambda = map.lambda.accept(this),
+    )
+
+    override suspend fun visitNumberLiteral(numberLiteral: NumberLiteral) = numberLiteral
+    override suspend fun visitOperation(operation: Operation): Expression = Operation(
+        left = operation.left.accept(this),
+        operator = operation.operator,
+        right = operation.right.accept(this),
+    )
+
+    override suspend fun visitReduce(reduce: Reduce) =
+        Reduce(
+            input = reduce.input.accept(this),
+            initial = reduce.initial.accept(this),
+            arg1 = reduce.arg1,
+            arg2 = reduce.arg2,
+            lambda = reduce.lambda.accept(this),
+        )
+
+    override suspend fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral) =
+        SequenceLiteral(
+            start = sequenceLiteral.start.accept(this),
+            end = sequenceLiteral.end.accept(this),
+        )
+}
+
 open class BooleanExpressionQuery(val strategy: Strategy) : ExpressionVisitor<Boolean> {
     private val default: Boolean = when (strategy) {
         Strategy.AND -> true
@@ -32,8 +63,12 @@ open class BooleanExpressionQuery(val strategy: Strategy) : ExpressionVisitor<Bo
     override suspend fun visitSequenceLiteral(sequenceLiteral: SequenceLiteral) =
         query(sequenceLiteral.start, sequenceLiteral.end)
 
-    override suspend fun visitOperation(operation: Operation) = query(operation.left, operation.right)
-    override suspend fun visitReduce(reduce: Reduce) = query(reduce.input, reduce.initial, reduce.lambda)
+    override suspend fun visitOperation(operation: Operation) =
+        query(operation.left, operation.right)
+
+    override suspend fun visitReduce(reduce: Reduce) =
+        query(reduce.input, reduce.initial, reduce.lambda)
+
     override suspend fun visitMap(map: MapJL): Boolean = query(map.input, map.lambda)
 
     protected suspend fun query(vararg expressions: Expression) = when (strategy) {

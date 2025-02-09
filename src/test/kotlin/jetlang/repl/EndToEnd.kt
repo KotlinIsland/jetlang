@@ -8,7 +8,7 @@ class TestEndToEnd {
     @Test
     fun reduce() = runReplTest {
 
-        val command = "reduce(range, initial, previous next -> previous + next * next)"
+        val command = "reduce(range, initial, previous next -> (previous + previous)*(next + next))"
         onNodeWithText("Enter command").performTextInput(
             """
             var start = 2
@@ -35,7 +35,7 @@ class TestEndToEnd {
             get(3).assertTextEquals("3")
             get(4).assertTextEquals("computing: $command")
             get(5).assertTextEquals("and the result is.....")
-            get(6).assertTextEquals("142852004")
+            get(6).assertTextEquals("29727129600")
         }
     }
 }
