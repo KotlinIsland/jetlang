@@ -52,6 +52,8 @@ compose.desktop {
                 menu = true
                 // see https://wixtoolset.org/documentation/manual/v3/howtos/general/generate_guids.html
                 upgradeUuid = "2f2af9d7-dc22-41bc-93fd-4f6fad917dd8"
+
+                iconFile.set(project.file("icon.ico"))
             }
         }
     }
