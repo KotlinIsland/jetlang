@@ -245,7 +245,6 @@ fun Repl() {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
-
     val clipboardManager = LocalClipboardManager.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -315,8 +314,8 @@ private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(Dp.Hairline, Color.DarkGray, RoundedCornerShape(8.dp))
-                    .background(Color.LightGray, RoundedCornerShape(8.dp))
+                    .border(Dp.Hairline, Color(0xa0, 0xa0, 0xa0), RoundedCornerShape(8.dp))
+                    .background(Color(0xf0, 0xf0, 0xf0), RoundedCornerShape(8.dp))
                     .padding(8.dp)
             )
             Row(
