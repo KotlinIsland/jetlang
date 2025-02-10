@@ -3,6 +3,7 @@ package jetlang.interpreter
 import jetlang.parser.*
 import jetlang.parser.BooleanExpressionQuery.Companion.Strategy
 import jetlang.types.NumberJL
+import jetlang.types.RangeSequenceJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
 import kotlinx.coroutines.CancellationException
@@ -137,7 +138,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
             return InterpreterResult.Error("Sequence start value is greater than end value: {${start.textContent()}, ${end.textContent()}}")
         }
         return InterpreterResult.Success(
-            SequenceJL(start.value.intValueExact()..end.value.intValueExact())
+            RangeSequenceJL(start.value.intValueExact()..end.value.intValueExact())
         )
     }
 
@@ -194,6 +195,16 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
         }
         val lambda = reduce.lambda
 
+        // special case summation
+        if (input is RangeSequenceJL && lambda is Operation && lambda.operator == Operator.ADD) {
+            for ((a, b) in listOf(lambda.left to lambda.right, lambda.right to lambda.left)) {
+                if (a == Identifier(reduce.arg1) && b == Identifier(reduce.arg2)) {
+                    val result1 = input.range.last * (input.range.last + 1) / 2
+                    val result2 = (input.range.first - 1) * (input.range.first) / 2
+                    return NumberJL((result1 - result2).toBigDecimal() + initial.value).toResult()
+                }
+            }
+        }
         suspend fun executeReduce(input: List<Value>): InterpreterResult<Value> {
             if (input.size == 1) {
                 return InterpreterResult.Success(input[0])
@@ -215,8 +226,8 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
             val rightRange = input.subList(mid, input.size)
             return coroutineScope {
                 ensureActive()
-                val leftDeferred = async(Dispatchers.Default) { executeReduce(leftRange) }
-                val rightDeferred = async(Dispatchers.Default) { executeReduce(rightRange) }
+                val leftDeferred = async(Dispatchers.IO) { executeReduce(leftRange) }
+                val rightDeferred = async(Dispatchers.IO) { executeReduce(rightRange) }
 
                 executeReduce(
                     listOf(
@@ -239,11 +250,15 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
             map.input.accept(this)
                 .map { it.checkIs<SequenceJL>("Input for `map`") }
                 .isError { return it }
+        // special case identity function
+        if (map.lambda is Identifier && map.lambda.name == map.arg) {
+            return input.toResult() // it's okay to return the sequence without copying it, it's immutable
+        }
         return coroutineScope {
             runCatching {
                 SequenceJL(
                     input.values.map {
-                        async(Dispatchers.Default) {
+                        async(Dispatchers.IO) {
                             ensureActive()
                             map.lambda.accept(
                                 ExpressionInterpreter(

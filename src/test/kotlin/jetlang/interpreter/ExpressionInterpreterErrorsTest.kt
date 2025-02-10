@@ -3,6 +3,7 @@ package jetlang.interpreter
 import assertInterpretsAs
 import jetlang.parser.*
 import jetlang.types.NumberJL
+import jetlang.types.RangeSequenceJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
 import jetlang.utility.minus
@@ -32,7 +33,7 @@ class ExpressionInterpreterErrorsTest {
     @Test
     fun `test sequence start not number`() = runTest {
         assertEquals(
-            "Sequence start value is not a number: {1 2}",
+            "Sequence start value is not a number: {1, 2}",
             interpretExpressionError(
                 SequenceLiteral(sequenceLiteral, NumberLiteral(BigDecimal.TWO))
             )
@@ -54,7 +55,7 @@ class ExpressionInterpreterErrorsTest {
     @Test
     fun `test sequence end not number`() = runTest  {
         assertEquals(
-            "Sequence end value is not a number: {1 2}",
+            "Sequence end value is not a number: {1, 2}",
             interpretExpressionError(
                 SequenceLiteral(
                     NumberLiteral(BigDecimal.ONE), sequenceLiteral
@@ -80,7 +81,7 @@ class ExpressionInterpreterErrorsTest {
         SequenceLiteral(
             NumberLiteral(BigDecimal.ONE),
             NumberLiteral(BigDecimal.ONE)
-        ) assertInterpretsAs SequenceJL(1..1)
+        ) assertInterpretsAs RangeSequenceJL(1..1)
     }
 
     @Test
@@ -96,7 +97,7 @@ class ExpressionInterpreterErrorsTest {
     @Test
     fun `test operation not number left`() = runTest  {
         assertEquals(
-            "for left operand expected NumberJL, got {1}",
+            "for left operand expected NumberJL, got {1, 1}",
             interpretExpressionError(
                     SequenceLiteral(NumberLiteral(1), NumberLiteral(1))
 +                    NumberLiteral(1),
@@ -107,7 +108,7 @@ class ExpressionInterpreterErrorsTest {
     @Test
     fun `test operation not number right`() = runTest  {
         assertEquals(
-            "for right operand expected NumberJL, got {1}",
+            "for right operand expected NumberJL, got {1, 1}",
             interpretExpressionError(
                     NumberLiteral(1) +
                     SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),

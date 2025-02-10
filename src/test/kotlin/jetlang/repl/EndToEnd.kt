@@ -28,7 +28,7 @@ class TestEndToEnd {
         )
         outputSection.onChildren().apply {
             get(0).assertTextEquals("range =")
-            get(1).assertTextEquals("{4 5 6 7 8 9 10}")
+            get(1).assertTextEquals("{4, 10}")
             get(2).assertTextEquals("initial =")
             get(3).assertTextEquals("3")
             get(4).assertTextEquals("computing: $command")
