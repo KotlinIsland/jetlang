@@ -14,6 +14,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.channelFlow
 import java.lang.ArithmeticException
 import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -58,10 +59,10 @@ fun Output?.shouldSend(): Boolean {
     }
 }
 
-class Interpreter : StatementVisitor<Output?> {
+class Interpreter(numberScale: Int = 30) : StatementVisitor<Output?> {
     val names = mutableMapOf<String, Value>()
 
-    val expressionInterpreter = ExpressionInterpreter(names)
+    val expressionInterpreter = ExpressionInterpreter(names, numberScale)
 
     fun interpret(program: Program) = channelFlow {
         var last: Output? = null
@@ -106,7 +107,7 @@ class Interpreter : StatementVisitor<Output?> {
 val BigDecimal.isInt
     get() = stripTrailingZeros().scale() <= 0
 
-class ExpressionInterpreter(private val names: Map<String, Value>) :
+class ExpressionInterpreter(private val names: Map<String, Value>, private val numberScale: Int = 30) :
     ExpressionVisitor<InterpreterResult<*>> {
     override suspend fun visitNumberLiteral(numberLiteral: NumberLiteral) =
         InterpreterResult.Success(NumberJL(numberLiteral.value))
@@ -159,7 +160,12 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
                 Operator.ADD -> left.value + right.value
                 Operator.SUBTRACT -> left.value - right.value
                 Operator.MULTIPLY -> left.value * right.value
-                Operator.DIVIDE -> left.value / right.value
+                Operator.DIVIDE -> left.value.divide(
+                    right.value,
+                    numberScale,
+                    RoundingMode.HALF_EVEN
+                ).stripTrailingZeros()
+
                 Operator.EXPONENT -> {
                     left.value.pow(
                         try {
@@ -198,7 +204,8 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
                         mapOf(
                             reduce.arg1 to input[0],
                             reduce.arg2 to input[1],
-                        )
+                        ),
+                        numberScale,
                     )
                 )
             }
@@ -240,7 +247,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>) :
                             ensureActive()
                             map.lambda.accept(
                                 ExpressionInterpreter(
-                                    mapOf(map.arg to it)
+                                    mapOf(map.arg to it), numberScale
                                 )
                             ).isError { error ->
                                 // throw instead of returning to cancel the sibling coroutines
@@ -343,7 +350,8 @@ class AssociativeSimplifier(a: String, b: String) : ExpressionTransformer() {
     }
 }
 
-class IsAssociative(private val a: String, private val b: String) : BooleanExpressionQuery(Strategy.AND) {
+class IsAssociative(private val a: String, private val b: String) :
+    BooleanExpressionQuery(Strategy.AND) {
     private var foundA = false
     private var foundB = false
     lateinit var foundOperator: Operator

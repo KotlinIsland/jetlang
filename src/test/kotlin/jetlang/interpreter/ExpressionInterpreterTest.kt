@@ -17,7 +17,7 @@ import kotlinx.coroutines.test.runTest
 import java.math.BigDecimal
 import kotlin.test.*
 
-fun <TValue: Value> InterpreterResult<TValue>.get() = when (this) {
+fun <TValue : Value> InterpreterResult<TValue>.get() = when (this) {
     is Success -> value
     is InterpreterResult.Error -> throw RuntimeException("Interpreter error: $value")
 }
@@ -55,28 +55,33 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun `test add operation`() = runTest  {
-            NumberLiteral(1) +  NumberLiteral(2) assertInterpretsAs NumberJL(3)
+    fun `test add operation`() = runTest {
+        NumberLiteral(1) + NumberLiteral(2) assertInterpretsAs NumberJL(3)
     }
 
     @Test
-    fun `test subtract operation`() = runTest  {
+    fun `test subtract operation`() = runTest {
         NumberLiteral(3) - NumberLiteral(2) assertInterpretsAs NumberJL(1)
     }
 
     @Test
-    fun `test multiply operation`() = runTest  {
+    fun `test multiply operation`() = runTest {
         NumberLiteral(3) * NumberLiteral(2) assertInterpretsAs NumberJL(6)
     }
 
     @Test
-    fun `test divide operation`() = runTest  {
-            NumberLiteral(6) / NumberLiteral(3) assertInterpretsAs NumberJL(2)
+    fun `divide operation`() = runTest {
+        NumberLiteral(6) / NumberLiteral(3) assertInterpretsAs NumberJL(2)
     }
 
     @Test
-    fun `test exponent operation`() = runTest  {
-            NumberLiteral(3) pow NumberLiteral(2) assertInterpretsAs NumberJL(9)
+    fun `divide operation with decimal`() = runTest {
+        NumberLiteral(4) / NumberLiteral(3) assertInterpretsAs NumberJL("1.333333333333333333333333333333".toBigDecimal())
+    }
+
+    @Test
+    fun `test exponent operation`() = runTest {
+        NumberLiteral(3) pow NumberLiteral(2) assertInterpretsAs NumberJL(9)
     }
 
     @Test
@@ -113,7 +118,7 @@ class ExpressionInterpreterTest {
     }
 
     @Test
-    fun map() = runTest  {
+    fun map() = runTest {
         MapJL(
             SequenceLiteral(NumberLiteral(1), NumberLiteral(3)),
             "a",
