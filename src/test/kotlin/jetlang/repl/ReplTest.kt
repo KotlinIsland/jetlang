@@ -81,13 +81,16 @@ class ReplTest {
     }
 
     @Test
-    @Ignore("cancel button disappears before we can click it")
     fun `cancel button`() = runReplTest {
         mainClock.autoAdvance = false
-        evaluate("test")
-        waitUntilDoesNotExist(hasText("Evaluate"))
+        // an operation that will take a non-trivial amount of time
+        evaluate("""
+            print "starting"
+            var sequence = map({0, 5000}, i -> 1^i / i)
+            """.trimIndent())
         onNodeWithText("Cancel").performClick()
         onNodeWithText("Evaluate").assertExists()
+        onNodeWithText("starting").assertExists()
         onNodeWithText("Canceled").assertExists()
     }
 
