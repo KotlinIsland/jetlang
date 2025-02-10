@@ -13,8 +13,19 @@ data class NumberJL(val value: BigDecimal) : Value() {
     override fun textContent() = value.toString()
 }
 
-data class SequenceJL(val values: List<Value>) : Value() {
-    constructor(values: IntRange) : this(values.toList().map { NumberJL(it) })
+sealed class SequenceJL : Value() {
+    abstract val values: List<Value>
+}
+
+fun SequenceJL(values: List<Value>) = SequenceJLImpl(values)
+
+data class SequenceJLImpl(override val values: List<Value>) : SequenceJL() {
     override fun textContent() =
         values.joinToString(" ", prefix = "{", postfix = "}") { it.textContent() }
+}
+
+data class RangeSequenceJL(val range: IntRange) : SequenceJL() {
+    override val values: List<Value>
+        get() = range.map(::NumberJL)
+    override fun textContent() = "{${range.first}, ${range.last}}"
 }

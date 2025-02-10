@@ -10,6 +10,7 @@ import jetlang.parser.Operator
 import jetlang.parser.Reduce
 import jetlang.parser.SequenceLiteral
 import jetlang.types.NumberJL
+import jetlang.types.RangeSequenceJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
 import jetlang.utility.*
@@ -23,7 +24,7 @@ fun <TValue : Value> InterpreterResult<TValue>.get() = when (this) {
 }
 
 suspend infix fun Expression.assertInterpretsAs(expected: Value) = assertEquals(
-    expected, (accept(ExpressionInterpreter(emptyMap())) as InterpreterResult.Success).value
+    expected, (accept(ExpressionInterpreter(emptyMap())) as Success).value
 )
 
 class ExpressionInterpreterTest {
@@ -118,11 +119,34 @@ class ExpressionInterpreterTest {
     }
 
     @Test
+    fun `reduce range sum optimization`() = runTest {
+        Reduce(
+            SequenceLiteral(NumberLiteral(5), NumberLiteral(10)),
+            NumberLiteral(7),
+            "a",
+            "b",
+            Identifier("a") + Identifier("b"),
+        ) assertInterpretsAs NumberJL(52)
+    }
+
+    @Test
     fun map() = runTest {
         MapJL(
             SequenceLiteral(NumberLiteral(1), NumberLiteral(3)),
             "a",
             Identifier("a") * NumberLiteral(2),
         ) assertInterpretsAs SequenceJL(listOf(NumberJL(2), NumberJL(4), NumberJL(6)))
+    }
+
+    @Test
+    fun `map with identity optimisation`() = runTest {
+        val result = SequenceJL(listOf(NumberJL(2), NumberJL(4), NumberJL(6)))
+        assertTrue(
+            result === (MapJL(
+                Identifier("input"),
+                "a",
+                Identifier("a"),
+            ).accept(ExpressionInterpreter(mapOf("input" to result))) as Success).value
+        )
     }
 }
