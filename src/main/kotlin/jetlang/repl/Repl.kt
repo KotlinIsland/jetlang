@@ -174,48 +174,50 @@ fun Repl() {
                         .focusRequester(inputFocus)
                         .testTag("input_field")
                         .onPreviewKeyEvent { keyEvent ->
-                        fun navigateHistory(amount: Int): Boolean {
-                            if (amount == 0) {
-                                return false
+                            fun navigateHistory(amount: Int): Boolean {
+                                if (amount == 0) {
+                                    return false
+                                }
+                                val selection = inputFieldText.selection.start
+                                if ((selection != inputFieldText.selection.end)
+                                    || if (amount < 0)
+                                        selection > (inputFieldText.text.indexOf("\n")
+                                            .takeUnless { it == -1 } ?: selection)
+                                    else selection < inputFieldText.text.lastIndexOf("\n") + 1
+                                ) {
+                                    return false
+                                }
+                                val newSelection =
+                                    (history + (tempHistory.text to null)).getOrNull(
+                                        historySelection + amount
+                                    ) ?: return false
+                                if (historySelection == history.size) {
+                                    tempHistory = inputFieldText
+                                }
+                                historySelection += amount
+                                inputFieldText = TextFieldValue(newSelection.first)
+                                return true
                             }
-                            val selection = inputFieldText.selection.start
-                            if ((selection != inputFieldText.selection.end)
-                                || if (amount < 0)
-                                    selection > (inputFieldText.text.indexOf("\n")
-                                        .takeUnless { it == -1 } ?: selection)
-                                else selection < inputFieldText.text.lastIndexOf("\n") + 1
-                            ) {
-                                return false
+                            if (keyEvent.type != KeyEventType.KeyDown) {
+                                return@onPreviewKeyEvent false
                             }
-                            val newSelection =
-                                (history + (tempHistory.text to null)).getOrNull(historySelection + amount) ?: return false
-                            if (historySelection == history.size) {
-                                tempHistory = inputFieldText
-                            }
-                            historySelection += amount
-                            inputFieldText = TextFieldValue(newSelection.first)
-                            return true
-                        }
-                        if (keyEvent.type != KeyEventType.KeyDown) {
-                            return@onPreviewKeyEvent false
-                        }
-                        when {
-                            keyEvent.key == Key.Enter && (keyEvent.isCtrlPressed || keyEvent.isMetaPressed) -> {
-                                submit()
-                                true
-                            }
+                            when {
+                                keyEvent.key == Key.Enter && (keyEvent.isCtrlPressed || keyEvent.isMetaPressed) -> {
+                                    submit()
+                                    true
+                                }
 
-                            keyEvent.key == Key.DirectionUp -> navigateHistory(
-                                -1
-                            )
+                                keyEvent.key == Key.DirectionUp -> navigateHistory(
+                                    -1
+                                )
 
-                            keyEvent.key == Key.DirectionDown -> navigateHistory(
-                                +1
-                            )
+                                keyEvent.key == Key.DirectionDown -> navigateHistory(
+                                    +1
+                                )
 
-                            else -> false
-                        }
-                    },
+                                else -> false
+                            }
+                        },
                     shape = RoundedCornerShape(8.dp),
                     placeholder = { Text("Enter command") },
                     textStyle = TextStyle(fontFamily = FontFamily.Monospace),
@@ -252,84 +254,80 @@ private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
     Box(
         Modifier
             .fillMaxWidth()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null // remove ripple effect.  Use rememberRipple() for more control
-            ) {} // Empty click listener for hover to work
+            .hoverable(interactionSource = interactionSource)
     ) {
-
-        Column(
-            Modifier
-
-                // Here we need to draw a border for the output section, but not obscure the border of the
-                // input section
-                .drawBehind {
-                    drawIntoCanvas { canvas ->
-                        val stroke = 1.dp.toPx()
-                        val radius = 8f
-                        val paint = Paint().apply {
-                            color = Color.LightGray
-                            strokeWidth = 1f
-                        }
-
-                        canvas.drawLine(
-                            Offset(0f, 15f),
-                            Offset(0f, size.height - radius),
-                            paint = paint,
-                        )
-                        drawArc(
-                            color = Color.LightGray,
-                            startAngle = 90f,
-                            sweepAngle = 90f,
-                            useCenter = false,
-                            topLeft = Offset(0f, size.height - radius * 2),
-                            size = Size(radius * 2, radius * 2),
-                            style = Stroke(stroke)
-                        )
-                        canvas.drawLine(
-                            Offset(radius, size.height),
-                            Offset(size.width - radius, size.height),
-                            paint = paint,
-                        )
-                        drawArc(
-                            color = Color.LightGray,
-                            startAngle = 90f,
-                            sweepAngle = -90f,
-                            useCenter = false,
-                            topLeft = Offset(size.width - 2 * radius, size.height - radius * 2),
-                            size = Size(radius * 2, radius * 2),
-                            style = Stroke(stroke)
-                        )
-                        canvas.drawLine(
-                            Offset(size.width, size.height - radius),
-                            Offset(size.width, 15f),
-                            paint = paint,
-                        )
-                    }
-                }
-
-        ) {
-            Text(
-                history.first.split('\n').joinToString("\n... ", prefix = ">>> "),
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(Dp.Hairline, Color(0xa0, 0xa0, 0xa0), RoundedCornerShape(8.dp))
-                    .background(Color(0xf0, 0xf0, 0xf0), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
-            )
-            Row(
+        SelectionContainer {
+            Column(
                 Modifier
-                    .fillMaxWidth()
-                    .heightIn(50.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(8.dp)
 
+                    // Here we need to draw a border for the output section, but not obscure the border of the
+                    // input section
+                    .drawBehind {
+                        drawIntoCanvas { canvas ->
+                            val stroke = 1.dp.toPx()
+                            val radius = 8f
+                            val paint = Paint().apply {
+                                color = Color.LightGray
+                                strokeWidth = 1f
+                            }
+
+                            canvas.drawLine(
+                                Offset(0f, 15f),
+                                Offset(0f, size.height - radius),
+                                paint = paint,
+                            )
+                            drawArc(
+                                color = Color.LightGray,
+                                startAngle = 90f,
+                                sweepAngle = 90f,
+                                useCenter = false,
+                                topLeft = Offset(0f, size.height - radius * 2),
+                                size = Size(radius * 2, radius * 2),
+                                style = Stroke(stroke)
+                            )
+                            canvas.drawLine(
+                                Offset(radius, size.height),
+                                Offset(size.width - radius, size.height),
+                                paint = paint,
+                            )
+                            drawArc(
+                                color = Color.LightGray,
+                                startAngle = 90f,
+                                sweepAngle = -90f,
+                                useCenter = false,
+                                topLeft = Offset(size.width - 2 * radius, size.height - radius * 2),
+                                size = Size(radius * 2, radius * 2),
+                                style = Stroke(stroke)
+                            )
+                            canvas.drawLine(
+                                Offset(size.width, size.height - radius),
+                                Offset(size.width, 15f),
+                                paint = paint,
+                            )
+                        }
+                    }
+
+            ) {
+                Text(
+                    history.first.split('\n').joinToString("\n... ", prefix = ">>> "),
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(Dp.Hairline, Color(0xa0, 0xa0, 0xa0), RoundedCornerShape(8.dp))
+                        .background(Color(0xf0, 0xf0, 0xf0), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(50.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    SelectionContainer(Modifier.testTag("output_section")) {
+                    Column(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .testTag("output_section")
+                    ) {
                         history.second.forEach {
                             Text(
                                 it.value,
@@ -338,42 +336,45 @@ private fun HistoryEntry(history: Pair<String, SnapshotStateList<Output>>) {
                             )
                         }
                     }
-                }
-                AnimatedVisibility(
-                    visible = isHovered,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    TooltipArea(
-                        tooltip = {
-                            Surface(
-                                modifier = Modifier.shadow(4.dp),
-                                color = Color.White
+                    AnimatedVisibility(
+                        visible = isHovered,
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                    ) {
+                        TooltipArea(
+                            tooltip = {
+                                Surface(
+                                    modifier = Modifier.shadow(4.dp),
+                                    color = Color.White
+                                ) {
+                                    Text(
+                                        text = "Copy to Clipboard",
+                                        modifier = Modifier.padding(
+                                            horizontal = 10.dp,
+                                            vertical = 5.dp
+                                        )
+                                    )
+                                }
+                            },
+                            delayMillis = 500
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    clipboardManager.setText(
+                                        AnnotatedString(history.second.joinToString("\n") { it.value })
+                                    )
+                                },
+                                Modifier.testTag("copy_button"),
                             ) {
-                                Text(
-                                    text = "Copy to Clipboard",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                Icon(
+                                    Icons.Filled.ContentCopy,
+                                    contentDescription = "Copy to clipboard",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = ContentAlpha.medium),
                                 )
                             }
-                        },
-                        delayMillis = 500
-                    ) {
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(
-                                    AnnotatedString(history.second.joinToString("\n") { it.value })
-                                )
-                            },
-                            Modifier.testTag("copy_button"),
-                        ) {
-                            Icon(
-                                Icons.Filled.ContentCopy,
-                                contentDescription = "Copy to clipboard",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = ContentAlpha.medium),
-                            )
                         }
-                    }
 
+                    }
                 }
             }
         }
