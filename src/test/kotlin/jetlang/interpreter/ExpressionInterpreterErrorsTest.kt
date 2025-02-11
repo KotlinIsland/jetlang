@@ -12,6 +12,8 @@ import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import jetlang.utility.*
+import java.math.BigInteger
+
 suspend fun interpretExpressionError(
     expression: Expression,
     names: Map<String, Value> = emptyMap()
@@ -81,7 +83,7 @@ class ExpressionInterpreterErrorsTest {
         SequenceLiteral(
             NumberLiteral(BigDecimal.ONE),
             NumberLiteral(BigDecimal.ONE)
-        ) assertInterpretsAs RangeSequenceJL(1..1)
+        ) assertInterpretsAs RangeSequenceJL(BigInteger.ONE, BigInteger.ONE)
     }
 
     @Test
@@ -208,6 +210,21 @@ class ExpressionInterpreterErrorsTest {
                     SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
                     "it",
                     a,
+                ),
+                mapOf("a" to NumberJL(1)),
+            )
+        )
+    }
+
+    @Test
+    fun `map must return a number`() = runTest {
+        assertEquals(
+            "Map lambda resul expected NumberJL, got {1, 1}",
+            interpretExpressionError(
+                MapJL(
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
+                    "it",
+                    SequenceLiteral(NumberLiteral(1), NumberLiteral(1)),
                 ),
                 mapOf("a" to NumberJL(1)),
             )

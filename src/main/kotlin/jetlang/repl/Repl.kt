@@ -52,7 +52,6 @@ import kotlinx.coroutines.launch
 @Composable
 @Preview()
 fun Repl() {
-    // TODO: settings pane where you can pick the number scale of the interpreter
     val interpreter = remember { Interpreter() }
     val history = remember {
         mutableStateListOf<Pair<String, SnapshotStateList<Output>>>()

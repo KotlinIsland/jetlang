@@ -1,21 +1,15 @@
 package jetlang.interpreter
 
+import jetlang.fraction.Fraction
 import jetlang.parser.*
 import jetlang.parser.BooleanExpressionQuery.Companion.Strategy
 import jetlang.types.NumberJL
 import jetlang.types.RangeSequenceJL
 import jetlang.types.SequenceJL
 import jetlang.types.Value
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.channelFlow
-import java.lang.ArithmeticException
-import java.math.BigDecimal
-import java.math.RoundingMode
+import java.math.BigInteger
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -60,10 +54,10 @@ fun Output?.shouldSend(): Boolean {
     }
 }
 
-class Interpreter(numberScale: Int = 30) : StatementVisitor<Output?> {
+class Interpreter : StatementVisitor<Output?> {
     val names = mutableMapOf<String, Value>()
 
-    val expressionInterpreter = ExpressionInterpreter(names, numberScale)
+    val expressionInterpreter = ExpressionInterpreter(names)
 
     fun interpret(program: Program) = channelFlow {
         var last: Output? = null
@@ -105,10 +99,7 @@ class Interpreter(numberScale: Int = 30) : StatementVisitor<Output?> {
     }
 }
 
-val BigDecimal.isInt
-    get() = stripTrailingZeros().scale() <= 0
-
-class ExpressionInterpreter(private val names: Map<String, Value>, private val numberScale: Int = 30) :
+class ExpressionInterpreter(private val names: Map<String, Value>) :
     ExpressionVisitor<InterpreterResult<*>> {
     override suspend fun visitNumberLiteral(numberLiteral: NumberLiteral) =
         InterpreterResult.Success(NumberJL(numberLiteral.value))
@@ -138,7 +129,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
             return InterpreterResult.Error("Sequence start value is greater than end value: {${start.textContent()}, ${end.textContent()}}")
         }
         return InterpreterResult.Success(
-            RangeSequenceJL(start.value.intValueExact()..end.value.intValueExact())
+            RangeSequenceJL(start.value.toBigInteger(), end.value.toBigInteger())
         )
     }
 
@@ -161,16 +152,12 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
                 Operator.ADD -> left.value + right.value
                 Operator.SUBTRACT -> left.value - right.value
                 Operator.MULTIPLY -> left.value * right.value
-                Operator.DIVIDE -> left.value.divide(
-                    right.value,
-                    numberScale,
-                    RoundingMode.HALF_EVEN
-                ).stripTrailingZeros()
+                Operator.DIVIDE -> left.value / right.value
 
                 Operator.EXPONENT -> {
                     left.value.pow(
                         try {
-                            right.value.intValueExact()
+                            right.value.toBigInteger().toInt()
                         } catch (_: ArithmeticException) {
                             return InterpreterResult.Error("Raising to a decimal is not supported")
                         }
@@ -195,13 +182,21 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
         }
         val lambda = reduce.lambda
 
+        fun summation(n: BigInteger) = n * (n + BigInteger.ONE) / BigInteger.TWO
+
         // special case summation
         if (input is RangeSequenceJL && lambda is Operation && lambda.operator == Operator.ADD) {
             for ((a, b) in listOf(lambda.left to lambda.right, lambda.right to lambda.left)) {
                 if (a == Identifier(reduce.arg1) && b == Identifier(reduce.arg2)) {
-                    val result1 = input.range.last * (input.range.last + 1) / 2
-                    val result2 = (input.range.first - 1) * (input.range.first) / 2
-                    return NumberJL((result1 - result2).toBigDecimal() + initial.value).toResult()
+                    // handle range of one
+                    if (input.first == input.last) {
+                        return NumberJL(Fraction(input.first, BigInteger.ONE) + initial.value).toResult()
+                    }
+                    return NumberJL(
+                        summation(input.last)
+                                - summation(input.first - BigInteger.ONE)
+                                + initial.value.toBigInteger()
+                    ).toResult()
                 }
             }
         }
@@ -216,7 +211,6 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
                             reduce.arg1 to input[0],
                             reduce.arg2 to input[1],
                         ),
-                        numberScale,
                     )
                 )
             }
@@ -239,7 +233,7 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
             }
         }
         return try {
-            executeReduce(listOf(initial, *input.values.toTypedArray()))
+            executeReduce(listOf(initial, *input.toList().toTypedArray()))
         } catch (failure: CancellationException) {
             InterpreterResult.Error(failure.message ?: "Reduce raised an unknown error")
         }
@@ -257,14 +251,16 @@ class ExpressionInterpreter(private val names: Map<String, Value>, private val n
         return coroutineScope {
             runCatching {
                 SequenceJL(
-                    input.values.map {
+                    input.toList().map {
                         async(Dispatchers.IO) {
                             ensureActive()
                             map.lambda.accept(
                                 ExpressionInterpreter(
-                                    mapOf(map.arg to it), numberScale
+                                    mapOf(map.arg to it)
                                 )
-                            ).isError { error ->
+                            )
+                                .map { result -> result.checkIs<NumberJL>("Map lambda resul") }
+                                .isError { error ->
                                 // throw instead of returning to cancel the sibling coroutines
                                 throw CancellationException(error.value)
                             }

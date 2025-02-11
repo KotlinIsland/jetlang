@@ -1,3 +1,4 @@
+import jetlang.fraction.Fraction
 import jetlang.interpreter.ExpressionInterpreter
 import jetlang.interpreter.InterpreterResult
 import jetlang.interpreter.InterpreterResult.Success
@@ -77,7 +78,7 @@ class ExpressionInterpreterTest {
 
     @Test
     fun `divide operation with decimal`() = runTest {
-        NumberLiteral(4) / NumberLiteral(3) assertInterpretsAs NumberJL("1.333333333333333333333333333333".toBigDecimal())
+        NumberLiteral(4) / NumberLiteral(3) assertInterpretsAs NumberJL(Fraction(4, 3))
     }
 
     @Test
@@ -127,6 +128,28 @@ class ExpressionInterpreterTest {
             "b",
             Identifier("a") + Identifier("b"),
         ) assertInterpretsAs NumberJL(52)
+    }
+
+    @Test
+    fun `reduce range sum one`() = runTest {
+        Reduce(
+            SequenceLiteral(NumberLiteral(5), NumberLiteral(5)),
+            NumberLiteral(7),
+            "a",
+            "b",
+            Identifier("a") + Identifier("b"),
+        ) assertInterpretsAs NumberJL(12)
+    }
+
+    @Test
+    fun `reduce range sum optimization large`() = runTest {
+        Reduce(
+            SequenceLiteral(NumberLiteral(0), NumberLiteral(50000)),
+            NumberLiteral(0),
+            "a",
+            "b",
+            Identifier("a") + Identifier("b"),
+        ) assertInterpretsAs NumberJL(1250025000)
     }
 
     @Test
